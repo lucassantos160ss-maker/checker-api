@@ -121,8 +121,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0');
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer ' . $MP_ACCESS_TOKEN,
+        'Authorization: Bearer ' . trim($MP_ACCESS_TOKEN),
         'Content-Type: application/json',
         'X-Idempotency-Key: ' . uniqid('mp_', true)
     ]);
@@ -204,8 +205,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0');
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer ' . $MP_ACCESS_TOKEN
+        'Authorization: Bearer ' . trim($MP_ACCESS_TOKEN)
     ]);
 
     $response = curl_exec($ch);
