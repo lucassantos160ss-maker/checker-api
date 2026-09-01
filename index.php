@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// ✅ CHK DO PECINHA - CÓDIGOS COMPLETOS E ALEATÓRIOS
+// ✅ CHK DO PECINHA - COM EFEITO SONORO DE SINO (PLIM)
 // =====================================================
 
 session_start();
@@ -53,7 +53,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     $sorteio = rand(1, 100);
 
     if ($sorteio <= 40) {
-        // Sorteia entre os códigos LIVE: 54, N7 ou 00
         $tipo_live = rand(1, 3);
         if ($tipo_live === 1) {
             $retorno_msg = "Código: 54 - Transação Aprovada com Sucesso";
@@ -66,7 +65,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
         $html = "<span class='text-black font-extrabold bg-white px-2.5 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
         echo json_encode(['status' => 'live', 'html' => $html]);
     } else {
-        // Sorteia entre os códigos DIE: 14, 51 ou 05
         $tipo_die = rand(1, 3);
         if ($tipo_die === 1) {
             $retorno_msg = "Código: 14 - Cartão Inválido ou Transação Recusada";
@@ -182,6 +180,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
         </div>
 
         <script>
+            // Função para tocar o som de sino "Plim" sintético em alta qualidade
+            function tocarSomPlim() {
+                try {
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    
+                    // Frequência alta inicial simulando o impacto do sino (Nota Dó aguda / C7)
+                    const osc = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(1046.50, audioCtx.currentTime); // C6
+                    osc.frequency.exponentialRampToValueAtTime(2093.00, audioCtx.currentTime + 0.1); // Sobe levemente pro C7
+
+                    // Envelope de volume (fade out suave igual a um sino ecoando)
+                    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.2);
+
+                    osc.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 1.2);
+                } catch (e) {
+                    // Ignora bloqueios de autoplay do navegador se houver
+                }
+            }
+
             function dispararConfeteLive() {
                 const count = 100;
                 const defaults = {
@@ -253,7 +278,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                         resDiv.scrollTop = resDiv.scrollHeight;
 
                         if (data.status === 'live') {
-                            dispararConfeteLive();
+                            tocarSomPlim(); // Toca o toque de sino "plim"
+                            dispararConfeteLive(); // Dispara os confetes
                             panel.classList.add('live-flash-effect');
                             setTimeout(() => {
                                 panel.classList.remove('live-flash-effect');
