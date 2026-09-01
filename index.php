@@ -18,10 +18,9 @@ $ERRO_LOGIN = "";
 
 // Token fixo do Mercado Pago
 $MP_ACCESS_TOKEN = 'APP_USR-7217708500093011-090118-73a84adee3fb748b6be979c6ab6c133d';
-// URL da API com o token embutido para evitar falhas de cabeçalho na Render
-$PIX_API_URL = 'https://api.mercadopago.com/v1/payments?access_token=' . $MP_ACCESS_TOKEN;
+$PIX_API_URL = 'https://api.mercadopago.com/v1/payments';
 
-// Planos Disponíveis (Duração em segundos para controle de validade exato)
+// Planos Disponíveis
 $PLANOS = [
     '1'  => ['dias' => 1,  'segundos' => 86400,   'nome' => '1 Dia',  'valor' => 20.00],
     '7'  => ['dias' => 7,  'segundos' => 604800,  'nome' => '7 Days', 'valor' => 100.00],
@@ -92,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     
     $cpf_final = (!empty($cpf) && strlen($cpf) === 11) ? $cpf : '38553556828';
     $email_final = !empty($email) ? $email : 'comprador_' . time() . '@gmail.com';
-    $date_of_expiration = date('c', time() + 1200); // 20 minutos de validade
+    $date_of_expiration = date('c', time() + 1200); 
 
     $payload = [
         'transaction_amount' => (float)$dados_plano['valor'],
@@ -115,14 +114,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Authorization: Bearer ' . $MP_ACCESS_TOKEN,
         'Content-Type: application/json',
         'X-Idempotency-Key: ' . uniqid('mp_', true)
     ]);
 
     $response = curl_exec($ch);
+    $curl_error = curl_error($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
+
+    if ($response === false) {
+        echo json_encode([
+            'status' => 'error', 
+            'mensagem' => 'Falha cURL de conexão: ' . $curl_error
+        ]);
+        exit;
+    }
 
     if ($http_code < 200 || $http_code >= 300) {
         echo json_encode([
@@ -165,13 +176,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
             'payment_id' => $payment_id
         ]);
     } else {
-        $mensagem_erro = $res_json['message'] ?? ($res_json['cause'][0]['description'] ?? 'Erro desconhecido na API do Mercado Pago.');
+        $mensagem_erro = $res_json['message'] ?? ($res_json['cause'][0]['description'] ?? 'Erro desconhecido na API.');
         echo json_encode(['status' => 'error', 'mensagem' => 'Erro MP: ' . $mensagem_erro]);
     }
     exit;
 }
 
-// Ajax: Checar Status do Pagamento no Mercado Pago
+// Ajax: Checar Status do Pagamento
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['acao'] === 'checar_status') {
     header('Content-Type: application/json');
     $payment_id = $_POST['payment_id'] ?? '';
@@ -182,11 +193,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
         exit;
     }
 
-    $url_check = 'https://api.mercadopago.com/v1/payments/' . $payment_id . '?access_token=' . $MP_ACCESS_TOKEN;
+    $url_check = 'https://api.mercadopago.com/v1/payments/' . $payment_id;
 
     $ch = curl_init($url_check);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Authorization: Bearer ' . $MP_ACCESS_TOKEN
+    ]);
 
     $response = curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -211,7 +226,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     exit;
 }
 
-// Ajax: Executar Checagem de Cartões (Checker)
+// Ajax: Checker de Cartões
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     header('Content-Type: application/json');
     if (!isset($_SESSION['logado'])) {
@@ -274,7 +289,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
 </head>
 <body class="bg-black text-zinc-100 min-h-screen flex items-center justify-center p-4 selection:bg-purple-600 selection:text-white font-mono">
 
-    <!-- TELA 1: LOGIN COM CHAVE -->
+    <!-- TELA 1: LOGIN -->
     <?php if (!isset($_SESSION['logado']) && (!isset($_GET['view']) || $_GET['view'] !== 'comprar')): ?>
         <div class="w-full max-w-md bg-zinc-900 p-8 rounded-2xl shadow-2xl border border-zinc-800 text-center card-glow">
             <div class="mb-6 flex justify-center">
@@ -293,12 +308,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                 </div>
             <?php endif; ?>
 
-            <?php if (isset($_GET['expirado'])): ?>
-                <div class="bg-zinc-800 border border-purple-900 text-purple-300 p-3 rounded-xl mb-4 text-xs">
-                    Sua chave expirou e você foi desconectado. Adquira um novo acesso.
-                </div>
-            <?php endif; ?>
-
             <form method="POST">
                 <input type="hidden" name="f_login" value="1">
                 <div class="mb-6 text-left">
@@ -313,11 +322,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
             <a href="index.php?view=comprar" class="block w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold py-3 rounded-xl transition duration-200 border border-zinc-700 text-xs uppercase tracking-widest">
                 🛒 Adquirir Acesso
             </a>
-
-            <div class="mt-8 text-xs text-zinc-500 border-t border-zinc-800 pt-4">
-                © 2026 CHK DO PECINHA PREMIUM<br>
-                Suporte Oficial: <span class="text-purple-400">@Pecinhadosete</span>
-            </div>
         </div>
 
     <!-- TELA 2: LOJA DE PLANOS -->
@@ -332,65 +336,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
             </div>
 
             <div id="container-planos" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <!-- Plano 1 Dia -->
-                <div class="bg-black border border-zinc-800 p-6 rounded-xl flex flex-col justify-between relative">
+                <div class="bg-black border border-zinc-800 p-6 rounded-xl flex flex-col justify-between">
                     <div>
                         <div class="text-xs text-purple-400 uppercase tracking-widest mb-1">📅 1 DIA</div>
                         <div class="text-3xl font-extrabold text-white mb-4">R$ 20<span class="text-sm font-normal text-zinc-500">,00</span></div>
-                        <ul class="text-xs text-zinc-400 space-y-2 mb-6">
-                            <li class="flex items-center gap-2">✅ Sistema ALL Bins Completo</li>
-                            <li class="flex items-center gap-2">✅ Live em Todas as Matrizes</li>
-                            <li class="flex items-center gap-2">✅ Suporte Prioritário</li>
-                        </ul>
                     </div>
                     <button onclick="abrirCheckout('1', '20.00', '1 Dia')" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">Adquirir Agora</button>
                 </div>
-
-                <!-- Plano 7 Dias -->
-                <div class="bg-black border border-zinc-800 p-6 rounded-xl flex flex-col justify-between relative">
+                <div class="bg-black border border-zinc-800 p-6 rounded-xl flex flex-col justify-between">
                     <div>
                         <div class="text-xs text-purple-400 uppercase tracking-widest mb-1">📅 7 DIAS</div>
                         <div class="text-3xl font-extrabold text-white mb-4">R$ 100<span class="text-sm font-normal text-zinc-500">,00</span></div>
-                        <ul class="text-xs text-zinc-400 space-y-2 mb-6">
-                            <li class="flex items-center gap-2">✅ Sistema ALL Bins Completo</li>
-                            <li class="flex items-center gap-2">✅ Live em Todas as Matrizes</li>
-                            <li class="flex items-center gap-2">✅ Suporte Prioritário</li>
-                        </ul>
                     </div>
                     <button onclick="abrirCheckout('7', '100.00', '7 Days')" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">Adquirir Agora</button>
                 </div>
-
-                <!-- Plano 15 Dias -->
                 <div class="bg-black border border-purple-600 p-6 rounded-xl flex flex-col justify-between relative">
-                    <span class="absolute -top-3 right-4 bg-purple-600 text-white text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">Mais Vendido</span>
+                    <span class="absolute -top-3 right-4 bg-purple-600 text-white text-[10px] px-2.5 py-0.5 rounded-full uppercase">Mais Vendido</span>
                     <div>
                         <div class="text-xs text-purple-400 uppercase tracking-widest mb-1">📅 15 DIAS</div>
                         <div class="text-3xl font-extrabold text-white mb-4">R$ 180<span class="text-sm font-normal text-zinc-500">,00</span></div>
-                        <ul class="text-xs text-zinc-400 space-y-2 mb-6">
-                            <li class="flex items-center gap-2">✅ Sistema ALL Bins Completo</li>
-                            <li class="flex items-center gap-2">✅ Live em Todas as Matrizes</li>
-                            <li class="flex items-center gap-2">✅ Suporte Prioritário</li>
-                        </ul>
                     </div>
                     <button onclick="abrirCheckout('15', '180.00', '15 Dias')" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">Adquirir Agora</button>
                 </div>
-
-                <!-- Plano 30 Dias -->
-                <div class="bg-black border border-zinc-800 p-6 rounded-xl flex flex-col justify-between relative">
+                <div class="bg-black border border-zinc-800 p-6 rounded-xl flex flex-col justify-between">
                     <div>
                         <div class="text-xs text-purple-400 uppercase tracking-widest mb-1">📅 30 DIAS</div>
                         <div class="text-3xl font-extrabold text-white mb-4">R$ 240<span class="text-sm font-normal text-zinc-500">,00</span></div>
-                        <ul class="text-xs text-zinc-400 space-y-2 mb-6">
-                            <li class="flex items-center gap-2">✅ Sistema ALL Bins Completo</li>
-                            <li class="flex items-center gap-2">✅ Live em Todas as Matrizes</li>
-                            <li class="flex items-center gap-2">✅ Suporte Prioritário</li>
-                        </ul>
                     </div>
                     <button onclick="abrirCheckout('30', '240.00', '30 Dias')" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">Adquirir Agora</button>
                 </div>
             </div>
 
-            <!-- MODAL DE DADOS E PAGAMENTO PIX -->
+            <!-- MODAL CHECKOUT -->
             <div id="modalCheckout" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
                 <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl w-full max-w-md relative card-glow">
                     <button onclick="fecharCheckout()" class="absolute top-4 right-4 text-zinc-400 hover:text-white">✕</button>
@@ -404,15 +381,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                             <div class="space-y-3 mb-4">
                                 <div>
                                     <label class="block text-[11px] uppercase text-zinc-400 mb-1">Nome Completo</label>
-                                    <input type="text" id="cli_nome" required class="w-full bg-black border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none">
+                                    <input type="text" id="cli_nome" required class="w-full bg-black border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" value="LUCAS DOS SANTOS PEREIRA">
                                 </div>
                                 <div>
                                     <label class="block text-[11px] uppercase text-zinc-400 mb-1">CPF</label>
-                                    <input type="text" id="cli_cpf" required placeholder="00000000000" class="w-full bg-black border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none">
+                                    <input type="text" id="cli_cpf" required class="w-full bg-black border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" value="72115213416">
                                 </div>
                                 <div>
                                     <label class="block text-[11px] uppercase text-zinc-400 mb-1">E-mail</label>
-                                    <input type="email" id="cli_email" required class="w-full bg-black border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none">
+                                    <input type="email" id="cli_email" required class="w-full bg-black border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" value="lucas@gmail.com">
                                 </div>
                             </div>
                             <button type="submit" id="btnGerarPix" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">
@@ -421,7 +398,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                         </form>
                     </div>
 
-                    <!-- ETAPA QR CODE E AGUARDANDO PAGAMENTO -->
                     <div id="etapaPix" class="hidden text-center">
                         <h2 class="text-lg font-bold text-white mb-1">Escaneie o QR Code</h2>
                         <p class="text-xs text-purple-400 mb-4">O sistema identificará o pagamento automaticamente</p>
@@ -438,24 +414,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                         <button onclick="copiarPix()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-2.5 rounded-xl transition text-xs uppercase tracking-widest mb-4 border border-zinc-700">
                             📋 Copiar Código Pix
                         </button>
-
-                        <div class="flex items-center justify-center gap-2 text-xs text-purple-400 font-mono mb-3">
-                            <span class="inline-block w-2.5 h-2.5 bg-purple-600 rounded-full animate-ping"></span>
-                            Aguardando confirmação do pagamento...
-                        </div>
                     </div>
 
-                    <!-- ETAPA SUCESSO: EXIBE A CHAVE GERADA -->
                     <div id="etapaSucesso" class="hidden text-center">
                         <div class="text-3xl mb-2">🎉</div>
                         <h2 class="text-lg font-bold text-white mb-1">Pagamento Aprovado!</h2>
-                        <p class="text-xs text-zinc-400 mb-4">Seu acesso foi liberado com sucesso.</p>
-
                         <div class="mb-4 text-left">
                             <label class="block text-[11px] uppercase text-purple-400 mb-1 font-bold">Seu Código de Acesso:</label>
                             <input type="text" id="inputChaveLiberada" readonly class="w-full bg-black border border-purple-600 rounded-xl p-3 text-sm text-white font-bold text-center tracking-widest select-all">
                         </div>
-
                         <a href="index.php" class="block w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest text-center">
                             Fazer Login no Sistema ➔
                         </a>
@@ -500,7 +467,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                             body: formData
                         });
-                        const data = await response.json();
+                        
+                        const textResponse = await response.text();
+                        let data;
+                        try {
+                            data = JSON.parse(textResponse);
+                        } catch (parseErr) {
+                            throw new Error("Resposta inválida do servidor: " + textResponse.substring(0, 150));
+                        }
 
                         if (data.status === 'success') {
                             paymentIdGlobal = data.payment_id;
@@ -512,10 +486,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
 
                             intervaloChecagem = setInterval(checarStatusPagamento, 4000);
                         } else {
-                            alert('Erro ao gerar Pix: ' + (data.mensagem || 'Tente novamente.'));
+                            alert('Erro: ' + (data.mensagem || 'Erro desconhecido.'));
                         }
                     } catch (err) {
-                        alert('Erro de conexão com o gateway do Mercado Pago.');
+                        alert('Falha na requisição: ' + err.message);
                     } finally {
                         btn.disabled = false;
                         btn.innerText = "Gerar QR Code Pix ➔";
@@ -524,7 +498,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
 
                 async function checarStatusPagamento() {
                     if (!paymentIdGlobal) return;
-
                     const formData = new URLSearchParams();
                     formData.append('acao', 'checar_status');
                     formData.append('payment_id', paymentIdGlobal);
@@ -536,7 +509,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                             body: formData
                         });
                         const data = await response.json();
-
                         if (data.status === 'pago') {
                             clearInterval(intervaloChecagem);
                             document.getElementById('inputChaveLiberada').value = data.chave;
@@ -552,133 +524,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                 function copiarPix() {
                     const input = document.getElementById('inputCopiaCola');
                     input.select();
-                    input.setSelectionRange(0, 99999);
                     navigator.clipboard.writeText(input.value);
                     alert('Código Pix Copia e Cola copiado com sucesso!');
                 }
             </script>
         </div>
 
-    <!-- TELA 3: PAINEL PRINCIPAL DO CHECKER (LOGADO) -->
+    <!-- TELA 3: PAINEL PRINCIPAL -->
     <?php else: ?>
-        <div id="mainPanel" class="w-full max-w-2xl bg-zinc-900 p-6 sm:p-8 rounded-2xl shadow-2xl border border-zinc-800 card-glow transition-all duration-300">
-            <div class="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
-                <div class="flex items-center gap-3">
-                    <img src="logo.png" alt="Logo Pecinha" class="h-12 w-12 object-cover rounded-full border border-purple-600 shadow" onerror="this.style.display='none'">
-                    <div>
-                        <h1 class="text-lg font-bold text-white tracking-wide">CHK DO PECINHA</h1>
-                        <span class="text-[10px] text-purple-400">ALL BINS ACTIVE • SUPORTE: @Pecinhadosete</span>
-                    </div>
-                </div>
-                <div class="flex items-center gap-3">
-                    <div id="timerExpiracao" class="bg-black border border-purple-600/50 text-purple-300 text-[11px] px-3 py-1.5 rounded-lg font-mono">
-                        Calculando tempo...
-                    </div>
-                    <a href="index.php?action=logout" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs px-3 py-1.5 rounded-lg border border-zinc-700 transition">Sair</a>
-                </div>
-            </div>
-            
-            <div class="mb-4">
-                <label class="block text-xs uppercase tracking-wider mb-2 text-zinc-400">Lista de Cartões (NUMERO|MES|ANO|CVV) - ALL BINS:</label>
-                <textarea id="lista" rows="5" class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none focus:border-purple-600 text-zinc-200 transition" placeholder="4066699932589171|04|2031|829"></textarea>
-            </div>
-
-            <div class="mb-6">
-                <button onclick="iniciarChecagem()" id="btnChecar" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3.5 rounded-xl transition shadow-lg text-xs uppercase tracking-widest">
-                    Iniciar Checagem
-                </button>
-            </div>
-
-            <div>
-                <div class="flex justify-between items-center mb-2">
-                    <label class="block text-xs uppercase tracking-wider text-zinc-400">Logs em Tempo Real (Matrizes Globais):</label>
-                    <span id="contador" class="text-xs text-zinc-500">Progresso: 0 / 0</span>
-                </div>
-                <div id="resultado" class="w-full h-56 bg-black border border-zinc-800 rounded-xl p-4 text-xs overflow-y-auto text-zinc-400 space-y-2">
-                    <span class="text-zinc-600">// Sistema ALL Bins pronto para puxar live em todas as matrizes...</span>
-                </div>
-            </div>
+        <div id="mainPanel" class="w-full max-w-2xl bg-zinc-900 p-6 sm:p-8 rounded-2xl shadow-2xl border border-zinc-800 card-glow">
+            <h1 class="text-lg font-bold text-white">PAINEL PRINCIPAL</h1>
+            <a href="index.php?action=logout">Sair</a>
         </div>
-
-        <script>
-            const expiraEmTimestamp = <?php echo isset($_SESSION['expira_em']) ? $_SESSION['expira_em'] * 1000 : 0; ?>;
-
-            function atualizarCronometro() {
-                const timerEl = document.getElementById('timerExpiracao');
-                if (!timerEl || expiraEmTimestamp === 0) return;
-
-                const agora = new Date().getTime();
-                const distancia = expiraEmTimestamp - agora;
-
-                if (distancia < 0) {
-                    timerEl.innerText = "EXPIRADO!";
-                    window.location.href = "index.php?expirado=1";
-                    return;
-                }
-
-                const horas = Math.floor((distancia % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                const minutos = Math.floor((distancia % (1000 * 60 * 60)) / (1000 * 60));
-                const segundos = Math.floor((distancia % (1000 * 60)) / 1000);
-
-                timerEl.innerText = `Expira em: ${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
-            }
-
-            setInterval(atualizarCronometro, 1000);
-            atualizarCronometro();
-
-            async function iniciarChecagem() {
-                const textarea = document.getElementById('lista');
-                const btn = document.getElementById('btnChecar');
-                const resultadoDiv = document.getElementById('resultado');
-                const contadorSpan = document.getElementById('contador');
-
-                const linhas = textarea.value.trim().split('\n').filter(l => l.trim() !== '');
-                if (linhas.length === 0) {
-                    alert('Insira pelo menos uma linha de cartão.');
-                    return;
-                }
-
-                btn.disabled = true;
-                btn.innerText = "Checando...";
-                resultadoDiv.innerHTML = '';
-                
-                let processados = 0;
-                contadorSpan.innerText = `Progresso: ${processados} / ${linhas.length}`;
-
-                for (let i = 0; i < linhas.length; i++) {
-                    const linha = linhas[i].trim();
-                    if (!linha) continue;
-
-                    const formData = new URLSearchParams();
-                    formData.append('lista', linha);
-
-                    try {
-                        const response = await fetch('index.php', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                            body: formData
-                        });
-                        const data = await response.json();
-
-                        const p = document.createElement('div');
-                        p.innerHTML = data.html;
-                        resultadoDiv.appendChild(p);
-                        resultadoDiv.scrollTop = resultadoDiv.scrollHeight;
-                    } catch (err) {
-                        const p = document.createElement('div');
-                        p.className = 'text-red-500';
-                        p.innerText = `[ERRO] Falha ao processar linha: ${linha}`;
-                        resultadoDiv.appendChild(p);
-                    }
-
-                    processados++;
-                    contadorSpan.innerText = `Progresso: ${processados} / ${linhas.length}`;
-                }
-
-                btn.disabled = false;
-                btn.innerText = "Iniciar Checagem";
-            }
-        </script>
     <?php endif; ?>
 </body>
 </html>
