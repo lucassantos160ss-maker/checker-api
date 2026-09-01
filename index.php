@@ -93,6 +93,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     $email_final = !empty($email) ? $email : 'comprador_' . time() . '@gmail.com';
     $date_of_expiration = date('c', time() + 1200); 
 
+    // Tratamento seguro do nome e sobrenome
+    $partes_nome = explode(' ', $nome);
+    $first_name = !empty($partes_nome[0]) ? $partes_nome[0] : 'Cliente';
+    $last_name = (count($partes_nome) > 1) ? end($partes_nome) : 'Pecinha';
+
     $payload = [
         'transaction_amount' => (float)$dados_plano['valor'],
         'description' => "Assinatura " . $dados_plano['nome'] . " - CHK DO PECINHA",
@@ -100,8 +105,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
         'date_of_expiration' => $date_of_expiration,
         'payer' => [
             'email' => $email_final,
-            'first_name' => !empty($nome) ? explode(' ', $nome)[0] : 'Cliente',
-            'last_name' => (count(explode(' ', $nome)) > 1) ? end(explode(' ', $nome)) : 'Pecinha',
+            'first_name' => $first_name,
+            'last_name' => $last_name,
             'identification' => [
                 'type' => 'CPF',
                 'number' => $cpf_final
