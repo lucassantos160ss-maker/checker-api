@@ -129,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
             <div class="mb-4 flex items-center justify-between gap-4">
                 <div class="w-full">
                     <button onclick="iniciarChecagem()" id="btnChecar" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-lg transition duration-200 shadow-lg">
-                        Iniciar Checagem (Intervalo de 15s a 20s)
+                        Iniciar Checagem (Intervalo 15s a 20s)
                     </button>
                 </div>
             </div>
@@ -184,14 +184,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                     }
 
                     if (i < linhas.length - 1) {
-                        // Gera um tempo aleatório entre 15000ms (15s) e 20000ms (20s)
+                        // Intervalo padrão aleatório entre 15 e 20 segundos (15000ms a 20000ms)
                         const randomDelay = Math.floor(Math.random() * (20000 - 15000 + 1)) + 15000;
                         await new Promise(resolve => setTimeout(resolve, randomDelay));
                     }
                 }
 
                 btn.disabled = false;
-                btn.innerText = "Iniciar Checagem (Intervalo de 15s a 20s)";
+                btn.innerText = "Iniciar Checagem (Intervalo 15s a 20s)";
             }
         </script>
     <?php endif; ?>
