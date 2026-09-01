@@ -86,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
         <div class="w-full max-w-md bg-slate-800 p-8 rounded-xl shadow-2xl border border-slate-700 text-center">
             
             <div class="mb-6 flex justify-center">
-                <img src="sua-logo.png" alt="Logotipo" class="h-20 w-auto object-contain rounded-lg border border-slate-700 p-1 bg-slate-900" onerror="this.style.display='none'">
+                <img src="logo.png" alt="Logotipo Pecinha" class="h-28 w-28 object-cover rounded-full border-2 border-emerald-500 shadow-lg p-0.5 bg-slate-900" onerror="this.style.display='none'">
             </div>
 
             <h1 class="text-2xl font-bold mb-2 text-emerald-400">CHK DO PECINHA</h1>
@@ -115,7 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
         <div class="w-full max-w-2xl bg-slate-800 p-6 rounded-xl shadow-2xl border border-slate-700">
             <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
                 <div class="flex items-center gap-3">
-                    <img src="sua-logo.png" alt="Logo" class="h-10 w-auto object-contain rounded" onerror="this.style.display='none'">
+                    <img src="logo.png" alt="Logo Pecinha" class="h-12 w-12 object-cover rounded-full border border-emerald-500 shadow" onerror="this.style.display='none'">
                     <h1 class="text-xl font-bold text-emerald-400">CHK DO PECINHA</h1>
                 </div>
                 <a href="index.php?action=logout" class="bg-red-600/20 hover:bg-red-600/30 text-red-400 text-xs px-3 py-1.5 rounded-lg border border-red-500/30 transition">Sair</a>
@@ -126,19 +126,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                 <textarea id="lista" rows="5" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 text-slate-200 font-mono" placeholder="4066699932589171|04|2031|829"></textarea>
             </div>
 
-            <div class="mb-4 flex items-center gap-4">
-                <div class="w-1/2">
-                    <label class="block text-sm font-medium mb-2 text-slate-300">Intervalo de Segurança:</label>
-                    <select id="delay" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-200 focus:outline-none">
-                        <option value="500">0.5 Segundos</option>
-                        <option value="1000" selected>1 Segundo</option>
-                        <option value="2000">2 Segundos</option>
-                        <option value="3000">3 Segundos</option>
-                    </select>
-                </div>
-                <div class="w-1/2 flex items-end">
+            <div class="mb-4 flex items-center justify-between gap-4">
+                <div class="w-full">
                     <button onclick="iniciarChecagem()" id="btnChecar" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-lg transition duration-200 shadow-lg">
-                        Iniciar Checagem
+                        Iniciar Checagem (Intervalo de 15s a 20s)
                     </button>
                 </div>
             </div>
@@ -159,7 +150,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                 const texto = document.getElementById('lista').value.trim();
                 const resDiv = document.getElementById('resultado');
                 const btn = document.getElementById('btnChecar');
-                const delayMs = parseInt(document.getElementById('delay').value);
                 const contador = document.getElementById('contador');
 
                 if (!texto) {
@@ -194,12 +184,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                     }
 
                     if (i < linhas.length - 1) {
-                        await new Promise(resolve => setTimeout(resolve, delayMs));
+                        // Gera um tempo aleatório entre 15000ms (15s) e 20000ms (20s)
+                        const randomDelay = Math.floor(Math.random() * (20000 - 15000 + 1)) + 15000;
+                        await new Promise(resolve => setTimeout(resolve, randomDelay));
                     }
                 }
 
                 btn.disabled = false;
-                btn.innerText = "Iniciar Checagem";
+                btn.innerText = "Iniciar Checagem (Intervalo de 15s a 20s)";
             }
         </script>
     <?php endif; ?>
