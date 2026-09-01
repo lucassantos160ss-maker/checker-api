@@ -16,7 +16,7 @@ $CHAVES_INTERNAS = [
 $SENHA_MESTRE = "A4B9X2M7K1P8"; 
 $ERRO_LOGIN = "";
 
-// Credenciais do Mercado Pago Atualizadas com o Token Correto
+// Token fixo e direto para evitar qualquer falha de leitura na Render
 $MP_ACCESS_TOKEN = 'APP_USR-7217708500093011-090118-73a84adee3fb748b6be979c6ab6c133d';
 $PIX_API_URL = 'https://api.mercadopago.com/v1/payments';
 
@@ -116,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/json',
-        'Authorization: Bearer ' . $MP_ACCESS_TOKEN,
+        'Authorization: Bearer APP_USR-7217708500093011-090118-73a84adee3fb748b6be979c6ab6c133d',
         'X-Idempotency-Key: ' . uniqid('mp_', true)
     ]);
 
@@ -186,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer ' . $MP_ACCESS_TOKEN
+        'Authorization: Bearer APP_USR-7217708500093011-090118-73a84adee3fb748b6be979c6ab6c133d'
     ]);
 
     $response = curl_exec($ch);
