@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// ✅ CHK DO PECINHA - ALEATORIEDADE TOTAL DE STATUS
+// ✅ CHK DO PECINHA - CÓDIGOS COMPLETOS E ALEATÓRIOS
 // =====================================================
 
 session_start();
@@ -49,26 +49,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     $cc_ano = trim($dados_cc[2]);
     $cc_cvv = trim($dados_cc[3]);
 
-    // Sorteio totalmente aleatório e independente para cada cartão processado
-    // Chance de aproximadamente 40% de virar Live e 60% de virar Die de forma imprevisível
+    // Sorteio totalmente aleatório (40% chance de Live, 60% de Die)
     $sorteio = rand(1, 100);
 
     if ($sorteio <= 40) {
-        // É Live - Sorteia entre diferentes tipos de aprovação realistas
+        // Sorteia entre os códigos LIVE: 54, N7 ou 00
         $tipo_live = rand(1, 3);
         if ($tipo_live === 1) {
-            $html = "<span class='text-black font-extrabold bg-white px-2.5 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Código: 54 - Transação Aprovada com Sucesso</span>";
+            $retorno_msg = "Código: 54 - Transação Aprovada com Sucesso";
         } elseif ($tipo_live === 2) {
-            $html = "<span class='text-black font-extrabold bg-white px-2.5 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Código: N7 - Aprovado (AVS Match / Testado com Sucesso)</span>";
+            $retorno_msg = "Código: N7 - Aprovado (AVS Match / Testado com Sucesso)";
         } else {
-            $html = "<span class='text-black font-extrabold bg-white px-2.5 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Código: 00 - Aprovado sem Restrições</span>";
+            $retorno_msg = "Código: 00 - Aprovado sem Restrições";
         }
+        
+        $html = "<span class='text-black font-extrabold bg-white px-2.5 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
         echo json_encode(['status' => 'live', 'html' => $html]);
     } else {
-        // É Die - Sorteia entre diferentes códigos de recusa
+        // Sorteia entre os códigos DIE: 14, 51 ou 05
         $tipo_die = rand(1, 3);
         if ($tipo_die === 1) {
-            $retorno_msg = "Código: 14 - Cartão Inválido ou Recusado";
+            $retorno_msg = "Código: 14 - Cartão Inválido ou Transação Recusada";
         } elseif ($tipo_die === 2) {
             $retorno_msg = "Código: 51 - Saldo Insuficiente";
         } else {
