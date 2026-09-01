@@ -89,7 +89,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
 
     $dados_plano = $PLANOS[$plano_id];
     
-    // Assegura CPF e E-mail válidos estruturalmente caso venham em branco para evitar rejeição do Banco Central
     $cpf_final = (!empty($cpf) && strlen($cpf) === 11) ? $cpf : '38553556828';
     $email_final = !empty($email) ? $email : 'comprador_' . time() . '@gmail.com';
     $date_of_expiration = date('c', time() + 1200); // 20 minutos de validade
@@ -544,6 +543,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                             document.getElementById('inputChaveLiberada').value = data.chave;
                             document.getElementById('etapaPix').classList.add('hidden');
                             document.getElementById('etapaSucesso').classList.remove('hidden');
+                            if (typeof confetti === 'function') {
+                                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+                            }
                         }
                     } catch (e) {}
                 }
@@ -584,7 +586,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
 
             <div class="mb-6">
                 <button onclick="iniciarChecagem()" id="btnChecar" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3.5 rounded-xl transition shadow-lg text-xs uppercase tracking-widest">
-                    Iniciar Checagem (Intervalo 15s a 20s)
+                    Iniciar Checagem
                 </button>
             </div>
 
@@ -600,14 +602,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
         </div>
 
         <script>
-            const expiraEmTimestamp = <?php echo $_SESSION['expira_em']; ?> * 1000;
+            const expiraEmTimestamp = <?php echo isset($_SESSION['expira_em']) ? $_SESSION['expira_em'] * 1000 : 0; ?>;
 
             function atualizarCronometro() {
+                const timerEl = document.getElementById('timerExpiracao');
+                if (!timerEl || expiraEmTimestamp === 0) return;
+
                 const agora = new Date().getTime();
                 const distancia = expiraEmTimestamp - agora;
 
                 if (distancia < 0) {
-                    document.getElementById('timerExpiracao').innerText = "EXPIRADO!";
+                    timerEl.innerText = "EXPIRADO!";
                     window.location.href = "index.php?expirado=1";
                     return;
                 }
@@ -616,84 +621,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                 const minutos = Math.floor((distancia % (1000 * 60 * 60)) / (1000 * 60));
                 const segundos = Math.floor((distancia % (1000 * 60)) / 1000);
 
-                document.getElementById('timerExpiracao').innerText = `⏳ Restante: ${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
+                timerEl.innerText = `Expira em: ${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
             }
 
             setInterval(atualizarCronometro, 1000);
             atualizarCronometro();
 
-            function tocarSomPlim() {
-                try {
-                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    const osc = audioCtx.createOscillator();
-                    const gainNode = audioCtx.createGain();
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(1046.50, audioCtx.currentTime);
-                    osc.frequency.exponentialRampToValueAtTime(2093.00, audioCtx.currentTime + 0.1);
-                    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                    gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.2);
-                    osc.connect(gainNode);
-                    gainNode.connect(audioCtx.destination);
-                    osc.start();
-                    osc.stop(audioCtx.currentTime + 1.2);
-                } catch (e) {}
-            }
-
-            function dispararConfeteLive() {
-                confetti({ origin: { y: 0.7 }, colors: ['#a855f7', '#ffffff', '#7e22ce'], zIndex: 9999, particleCount: 80, spread: 70 });
-            }
-
             async function iniciarChecagem() {
-                const texto = document.getElementById('lista').value.trim();
-                const resDiv = document.getElementById('resultado');
+                const textarea = document.getElementById('lista');
                 const btn = document.getElementById('btnChecar');
-                const contador = document.getElementById('contador');
+                const resultadoDiv = document.getElementById('resultado');
+                const contadorSpan = document.getElementById('contador');
 
-                if (!texto) { alert('Insira uma lista válida!'); return; }
-
-                const linhas = texto.split('\n').map(l => l.trim()).filter(l => l !== '');
-                if (linhas.length === 0) return;
+                const linhas = textarea.value.trim().split('\n').filter(l => l.trim() !== '');
+                if (linhas.length === 0) {
+                    alert('Insira pelo menos uma linha de cartão.');
+                    return;
+                }
 
                 btn.disabled = true;
-                btn.classList.add('opacity-50', 'cursor-not-allowed');
-                btn.innerText = "Processando checagem...";
-                resDiv.innerHTML = "";
+                btn.innerText = "Checando...";
+                resultadoDiv.innerHTML = '';
                 
+                let processados = 0;
+                contadorSpan.innerText = `Progresso: ${processados} / ${linhas.length}`;
+
                 for (let i = 0; i < linhas.length; i++) {
-                    const linhaAtual = linhas[i];
-                    contador.innerText = `Progresso: ${i + 1} / ${linhas.length}`;
+                    const linha = linhas[i].trim();
+                    if (!linha) continue;
+
+                    const formData = new URLSearchParams();
+                    formData.append('lista', linha);
 
                     try {
-                        let response = await fetch('index.php', {
+                        const response = await fetch('index.php', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                            body: 'lista=' + encodeURIComponent(linhaAtual)
+                            body: formData
                         });
-                        let data = await response.json();
-                        
-                        let itemDiv = document.createElement('div');
-                        itemDiv.className = data.status === 'live' ? "border-l-4 border-purple-500 bg-zinc-900/90 p-2 rounded-r shadow-lg" : "border-l-2 border-zinc-800 pl-2 py-0.5";
-                        itemDiv.innerHTML = data.html;
-                        resDiv.appendChild(itemDiv);
-                        resDiv.scrollTop = resDiv.scrollHeight;
+                        const data = await response.json();
 
-                        if (data.status === 'live') {
-                            tocarSomPlim();
-                            dispararConfeteLive();
-                        }
+                        const p = document.createElement('div');
+                        p.innerHTML = data.html;
+                        resultadoDiv.appendChild(p);
+                        resultadoDiv.scrollTop = resultadoDiv.scrollHeight;
                     } catch (err) {
-                        resDiv.innerHTML += `<div class='text-zinc-600'>[ERRO] Falha na requisição.</div>`;
+                        const p = document.createElement('div');
+                        p.className = 'text-red-500';
+                        p.innerText = `[ERRO] Falha ao processar linha: ${linha}`;
+                        resultadoDiv.appendChild(p);
                     }
 
-                    if (i < linhas.length - 1) {
-                        const randomDelay = Math.floor(Math.random() * (20000 - 15000 + 1)) + 15000;
-                        await new Promise(resolve => setTimeout(resolve, randomDelay));
-                    }
+                    processados++;
+                    contadorSpan.innerText = `Progresso: ${processados} / ${linhas.length}`;
                 }
 
                 btn.disabled = false;
-                btn.classList.remove('opacity-50', 'cursor-not-allowed');
-                btn.innerText = "Iniciar Checagem (Intervalo 15s a 20s)";
+                btn.innerText = "Iniciar Checagem";
             }
         </script>
     <?php endif; ?>
