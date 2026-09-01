@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// ✅ CHECKER VTEX - CAPTURA DIRETA DO PAYLOAD COMPLETO DO GATEWAY
+// ✅ CHECKER VTEX - TRATAMENTO CORRETO DA RESPOSTA
 // =====================================================
 define('BASE_URL', 'https://loja.umlivro.com.br');
 define('EMAIL', 'danielvitordeoliveiraconceicao@gmail.com');
@@ -139,7 +139,7 @@ $json_final = json_decode($resp_payment, true);
 $aprovado = false;
 $msg_detalhada = "";
 
-// Varredura rigorosa em todas as camadas de erro possíveis da VTEX e Pagar.me
+// Varredura profunda nas transações retornadas pelo paymentData
 if (isset($json_final['paymentData']['transactions']) && is_array($json_final['paymentData']['transactions'])) {
     foreach ($json_final['paymentData']['transactions'] as $tx) {
         if (isset($tx['payments']) && is_array($tx['payments'])) {
@@ -150,7 +150,7 @@ if (isset($json_final['paymentData']['transactions']) && is_array($json_final['p
                     $aprovado = true;
                 }
                 
-                // Mapeia todas as possíveis chaves de retorno do adquirente/gateway
+                // Extrai mensagens específicas do conector se existirem
                 if (!empty($pay['connectorResponses']['message'])) {
                     $msg_detalhada = $pay['connectorResponses']['message'];
                 } elseif (!empty($pay['connectorResponses']['acquirerResponseMessage'])) {
@@ -165,7 +165,7 @@ if (isset($json_final['paymentData']['transactions']) && is_array($json_final['p
     }
 }
 
-// Se não achou na transação, checa mensagens de erro globais da API
+// Verifica mensagens globais de erro do orderForm
 if (empty($msg_detalhada) && isset($json_final['messages']) && is_array($json_final['messages'])) {
     foreach ($json_final['messages'] as $msg) {
         if (!empty($msg['text'])) {
@@ -176,8 +176,7 @@ if (empty($msg_detalhada) && isset($json_final['messages']) && is_array($json_fi
 }
 
 if (empty($msg_detalhada)) {
-    // Se o gateway ocultou a mensagem, mostra um trecho curto do JSON para diagnóstico visual imediato
-    $msg_detalhada = "Recusado (JSON: " . substr(strip_tags($resp_payment), 0, 80) . ")";
+    $msg_detalhada = "Transação recusada pelo gateway / adquirente";
 }
 
 if ($aprovado) {
