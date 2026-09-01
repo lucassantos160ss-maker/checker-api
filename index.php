@@ -16,9 +16,10 @@ $CHAVES_INTERNAS = [
 $SENHA_MESTRE = "A4B9X2M7K1P8"; 
 $ERRO_LOGIN = "";
 
-// Token fixo e direto para evitar qualquer falha de leitura na Render
+// Token fixo do Mercado Pago
 $MP_ACCESS_TOKEN = 'APP_USR-7217708500093011-090118-73a84adee3fb748b6be979c6ab6c133d';
-$PIX_API_URL = 'https://api.mercadopago.com/v1/payments';
+// URL da API com o token embutido para evitar falhas de cabeçalho na Render
+$PIX_API_URL = 'https://api.mercadopago.com/v1/payments?access_token=' . $MP_ACCESS_TOKEN;
 
 // Planos Disponíveis (Duração em segundos para controle de validade exato)
 $PLANOS = [
@@ -73,7 +74,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     exit;
 }
 
-// Ajax: Gerar Pix via Mercado Pago com Tratamento Robusto de Dados
+// Ajax: Gerar Pix via Mercado Pago
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['acao'] === 'gerar_pix') {
     header('Content-Type: application/json');
     
@@ -116,7 +117,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/json',
-        'Authorization: Bearer APP_USR-7217708500093011-090118-73a84adee3fb748b6be979c6ab6c133d',
         'X-Idempotency-Key: ' . uniqid('mp_', true)
     ]);
 
@@ -182,12 +182,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
         exit;
     }
 
-    $ch = curl_init($PIX_API_URL . '/' . $payment_id);
+    $url_check = 'https://api.mercadopago.com/v1/payments/' . $payment_id . '?access_token=' . $MP_ACCESS_TOKEN;
+
+    $ch = curl_init($url_check);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer APP_USR-7217708500093011-090118-73a84adee3fb748b6be979c6ab6c133d'
-    ]);
 
     $response = curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
