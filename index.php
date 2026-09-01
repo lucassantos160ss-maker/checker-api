@@ -1,10 +1,8 @@
 <?php
 session_start();
 
-// Usuário e senha padrão para você entrar no checker
 $usuario_padrao = "admin";
 $senha_padrao = "123";
-
 $erro = "";
 
 // Processar Login
@@ -28,34 +26,46 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     exit;
 }
 
-// Processar a Checagem (quando o botão de checar for acionado via JavaScript)
-if (isset($_POST['ajax_checar'])) {
+// Processar cada linha individualmente enviada pelo JavaScript
+if (isset($_POST['ajax_linha'])) {
     if (!isset($_SESSION['logado'])) {
-        exit("Sessão expirada. Faça login novamente.");
+        exit("Sessão expirada.");
     }
     
-    $lista = $_POST['lista'] ?? '';
-    $linhas = explode("\n", trim($lista));
+    $linha = trim($_POST['ajax_linha']);
+    if (empty($linha)) exit;
+
+    // Quebra os dados caso venha no formato: NUMERO|MES|ANO|CVV
+    $partes = explode('|', $linha);
+    $numero = $partes[0] ?? '';
+    $mes = $partes[1] ?? '';
+    $ano = $partes[2] ?? '';
+    $cvv = $partes[3] ?? '';
+
+    // --- COLOQUE SUA LÓGICA DE cURL REAL AQUI ---
+    /*
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, "SUA_API_EXTERNA_AQUI?numero=$numero&mes=$mes&ano=$ano&cvv=$cvv");
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    $resposta = curl_exec($ch);
+    curl_close($ch);
     
-    foreach ($linhas as $linha) {
-        $linha = trim($linha);
-        if (empty($linha)) continue;
-        
-        // --- AQUI ENTRA A SUA LÓGICA DE cURL E VALIDAÇÃO ---
-        // Exemplo de requisição cURL para testar a linha:
-        /*
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, "SUA_API_DE_CHECK_AQUI");
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, ['dados' => $linha]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        $resposta = curl_exec($ch);
-        curl_close($ch);
-        */
-        
-        // Exibindo o resultado linha por linha na tela de forma visual
-        echo "<span class='text-emerald-400'>[APROVADO]</span> $linha -> Retorno OK<br>";
+    // Exemplo de lógica baseada no retorno da API:
+    if (strpos($resposta, 'sucesso') !== false) {
+        echo "<span class='text-emerald-400 font-bold'>[LIVE]</span> $linha -> Aprovado!";
+    } else {
+        echo "<span class='text-red-400 font-bold'>[DIE]</span> $linha -> Reprovado!";
     }
+    */
+
+    // Simulação temporária de Live/Die para teste visual (Remova quando colocar sua API cURL)
+    $status_rand = (rand(1, 2) === 1);
+    if ($status_rand) {
+        echo "<span class='text-emerald-400 font-bold'>[LIVE]</span> $linha -> Aprovado com sucesso!";
+    } else {
+        echo "<span class='text-red-400 font-bold'>[DIE]</span> $linha -> Cartão ou dados recusados.";
+    }
+    
     exit;
 }
 ?>
@@ -64,12 +74,13 @@ if (isset($_POST['ajax_checar'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Checker Pro</title>
+    <title>Web Checker Pro - Realtime</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4">
 
     <?php if (!isset($_SESSION['logado'])): ?>
+        <!-- TELA DE LOGIN -->
         <div class="w-full max-w-md bg-slate-800 p-8 rounded-xl shadow-2xl border border-slate-700">
             <h1 class="text-2xl font-bold mb-6 text-center text-emerald-400">Login - Checker</h1>
             
@@ -93,69 +104,105 @@ if (isset($_POST['ajax_checar'])) {
                     Entrar no Sistema
                 </button>
             </form>
-            <div class="mt-4 text-center text-xs text-slate-500">
-                Usuário padrão: <b>admin</b> | Senha padrão: <b>123</b>
-            </div>
         </div>
 
     <?php else: ?>
+        <!-- PAINEL PRINCIPAL -->
         <div class="w-full max-w-2xl bg-slate-800 p-6 rounded-xl shadow-2xl border border-slate-700">
             <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
-                <h1 class="text-xl font-bold text-emerald-400">Painel de Checagem</h1>
+                <h1 class="text-xl font-bold text-emerald-400">Painel de Checagem em Tempo Real</h1>
                 <a href="index.php?action=logout" class="bg-red-600/20 hover:bg-red-600/30 text-red-400 text-xs px-3 py-1.5 rounded-lg border border-red-500/30 transition">Sair</a>
             </div>
             
             <div class="mb-4">
-                <label class="block text-sm font-medium mb-2 text-slate-300">Cole sua lista de números (um por linha):</label>
-                <textarea id="lista" rows="6" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 text-slate-200 font-mono" placeholder="NUMERO|MES|ANO|CVV"></textarea>
+                <label class="block text-sm font-medium mb-2 text-slate-300">Cole sua lista (NUMERO|MES|ANO|CVV):</label>
+                <textarea id="lista" rows="5" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 text-slate-200 font-mono" placeholder="4066699932589171|04|2031|829"></textarea>
             </div>
 
-            <button onclick="executarChecagem()" id="btnChecar" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-lg transition duration-200 shadow-lg">
-                Iniciar Checagem Automática
-            </button>
+            <div class="mb-4 flex items-center gap-4">
+                <div class="w-1/2">
+                    <label class="block text-sm font-medium mb-2 text-slate-300">Intervalo entre requisições:</label>
+                    <select id="delay" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-200 focus:outline-none">
+                        <option value="1000">1 Segundo</option>
+                        <option value="3000">3 Segundos</option>
+                        <option value="5000" selected>5 Segundos (Recomendado)</option>
+                        <option value="8000">8 Segundos</option>
+                        <option value="10000">10 Segundos</option>
+                    </select>
+                </div>
+                <div class="w-1/2 flex items-end">
+                    <button onclick="iniciarChecagem()" id="btnChecar" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-lg transition duration-200 shadow-lg">
+                        Iniciar Checagem
+                    </button>
+                </div>
+            </div>
 
             <div class="mt-6">
-                <label class="block text-sm font-medium mb-2 text-slate-300">Resultados em Tempo Real:</label>
-                <div id="resultado" class="w-full h-48 bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs font-mono overflow-y-auto text-slate-300">
-                    Aguardando dados...
+                <div class="flex justify-between items-center mb-2">
+                    <label class="block text-sm font-medium text-slate-300">Resultados:</label>
+                    <span id="contador" class="text-xs text-slate-400">Progresso: 0 / 0</span>
+                </div>
+                <div id="resultado" class="w-full h-52 bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs font-mono overflow-y-auto text-slate-300 space-y-1">
+                    Aguardando início...
                 </div>
             </div>
         </div>
 
         <script>
-            function executarChecagem() {
-                const lista = document.getElementById('lista').value;
+            let cancelado = false;
+
+            async function iniciarChecagem() {
+                const texto = document.getElementById('lista').value.trim();
                 const resDiv = document.getElementById('resultado');
                 const btn = document.getElementById('btnChecar');
+                const delayMs = parseInt(document.getElementById('delay').value);
+                const contador = document.getElementById('contador');
 
-                if (!lista.trim()) {
-                    alert('Cole uma lista válida antes de iniciar!');
+                if (!texto) {
+                    alert('Cole uma lista válida!');
                     return;
                 }
 
+                const linhas = texto.split('\n').map(l => l.trim()).filter(l => l !== '');
+                if (linhas.length === 0) return;
+
                 btn.disabled = true;
                 btn.innerText = "Checando...";
-                resDiv.innerHTML = "Iniciando processo...\n";
+                resDiv.innerHTML = "";
+                
+                let processados = 0;
 
-                fetch('index.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: 'ajax_checar=1&lista=' + encodeURIComponent(lista)
-                })
-                .then(response => response.text())
-                .then(data => {
-                    resDiv.innerHTML = data;
-                    btn.disabled = false;
-                    btn.innerText = "Iniciar Checagem Automática";
-                })
-                .catch(error => {
-                    resDiv.innerHTML += "<br><span class='text-red-400'>Erro na requisição.</span>";
-                    btn.disabled = false;
-                    btn.innerText = "Iniciar Checagem Automática";
-                });
+                for (let i = 0; i < linhas.length; i++) {
+                    const linhaAtual = linhas[i];
+                    contador.innerText = `Progresso: ${i + 1} / ${linhas.length}`;
+
+                    try {
+                        let response = await fetch('index.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: 'ajax_linha=' + encodeURIComponent(linhaAtual)
+                        });
+                        let resultadoHtml = await response.text();
+                        
+                        // Adiciona o resultado linha por linha descendo a tela
+                        resDiv.innerHTML += `<div>${resultadoHtml}</div>`;
+                        resDiv.scrollTop = resDiv.scrollHeight; // Mantém rolando para o final automático
+
+                    } catch (err) {
+                        resDiv.innerHTML += `<div class='text-red-400'>[ERRO] Falha ao testar: ${linhaAtual}</div>`;
+                    }
+
+                    // Se não for o último item, aguarda o tempo estipulado (delay) para não estourar a chave/API
+                    if (i < linhas.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, delayMs));
+                    }
+                }
+
+                btn.disabled = false;
+                btn.innerText = "Iniciar Checagem";
+                alert("Checagem finalizada!");
             }
         </script>
     <?php endif; ?>
-
 </body>
 </html>
