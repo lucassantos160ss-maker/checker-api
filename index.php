@@ -16,8 +16,8 @@ $CHAVES_INTERNAS = [
 $SENHA_MESTRE = "A4B9X2M7K1P8"; 
 $ERRO_LOGIN = "";
 
-// Credenciais do Mercado Pago Atualizadas com o novo Access Token da imagem
-$MP_ACCESS_TOKEN = 'APP_USR-7217708500093011-090118-73a8adee3fb748b6be979c6ab6c133d-3615204291';
+// Credenciais do Mercado Pago Atualizadas com o Token Correto
+$MP_ACCESS_TOKEN = 'APP_USR-7217708500093011-090118-73a84adee3fb748b6be979c6ab6c133d';
 $PIX_API_URL = 'https://api.mercadopago.com/v1/payments';
 
 // Planos Disponíveis (Duração em segundos para controle de validade exato)
