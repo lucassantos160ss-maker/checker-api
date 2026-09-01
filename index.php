@@ -30,7 +30,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Checker de Pecinha</title>
+    <title>CHK DO PECINHA</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4">
@@ -45,7 +45,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
                 <img src="sua-logo.png" alt="Logotipo" class="h-20 w-auto object-contain rounded-lg border border-slate-700 p-1 bg-slate-900" onerror="this.style.display='none'">
             </div>
 
-            <h1 class="text-2xl font-bold mb-2 text-emerald-400">Checker de Pecinha</h1>
+            <h1 class="text-2xl font-bold mb-2 text-emerald-400">CHK DO PECINHA</h1>
             <p class="text-xs text-slate-400 mb-6">Insira sua chave de acesso</p>
             
             <?php if (!empty($erro)): ?>
@@ -72,7 +72,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
             <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
                 <div class="flex items-center gap-3">
                     <img src="sua-logo.png" alt="Logo" class="h-10 w-auto object-contain rounded" onerror="this.style.display='none'">
-                    <h1 class="text-xl font-bold text-emerald-400">Checker de Pecinha</h1>
+                    <h1 class="text-xl font-bold text-emerald-400">CHK DO PECINHA</h1>
                 </div>
                 <a href="index.php?action=logout" class="bg-red-600/20 hover:bg-red-600/30 text-red-400 text-xs px-3 py-1.5 rounded-lg border border-red-500/30 transition">Sair</a>
             </div>
