@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// ✅ CHECKER VTEX - CORREÇÃO DO ORD002 (USO DE ATTACHMENTS)
+// ✅ CHECKER VTEX - CAPTURA DIRETA DE MENSAGEM DO GATEWAY
 // =====================================================
 define('BASE_URL', 'https://loja.umlivro.com.br');
 define('EMAIL', 'danielvitordeoliveiraconceicao@gmail.com');
@@ -90,7 +90,7 @@ if (!isset($json_cart['orderFormId'])) {
 
 $order_form_id = $json_cart['orderFormId'];
 
-// 3. Envia perfil do cliente (Endpoint padrão de attachments da VTEX)
+// 3. Envia perfil do cliente
 vtex_request(BASE_URL . "/api/checkout/pub/orderForm/" . $order_form_id . "/attachments/clientProfileData", [
     'email' => EMAIL, 
     'firstName' => CLIENT_FIRST_NAME, 
@@ -99,7 +99,7 @@ vtex_request(BASE_URL . "/api/checkout/pub/orderForm/" . $order_form_id . "/atta
     'phone' => CLIENT_PHONE
 ], ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
 
-// 4. Envia endereço de entrega (Endpoint padrão de attachments da VTEX)
+// 4. Envia endereço de entrega
 vtex_request(BASE_URL . "/api/checkout/pub/orderForm/" . $order_form_id . "/attachments/shippingAddress", [
     'postalCode' => SHIPPING_POSTAL_CODE, 
     'country' => SHIPPING_COUNTRY, 
@@ -111,7 +111,7 @@ vtex_request(BASE_URL . "/api/checkout/pub/orderForm/" . $order_form_id . "/atta
     'receiverName' => SHIPPING_RECEIVER_NAME
 ], ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
 
-// 5. Envia os dados de pagamento (Endpoint padrão de attachments da VTEX)
+// 5. Envia os dados de pagamento
 $payload_payment = [
     'payments' => [[
         'paymentSystem' => '1',
@@ -136,40 +136,52 @@ $resp_payment = vtex_request(BASE_URL . "/api/checkout/pub/orderForm/" . $order_
 
 $json_final = json_decode($resp_payment, true);
 
-// Verifica aprovação real
+// Análise profunda do retorno da VTEX
 $aprovado = false;
 $msg_detalhada = "";
 
-if (isset($json_final['paymentData']['transactions'])) {
-    foreach ($json_final['paymentData']['transactions'] as $tx) {
-        if (isset($tx['payments'])) {
-            foreach ($tx['payments'] as $pay) {
-                $status = $pay['status'] ?? '';
-                if ($status === 'approved' || $status === 'completed') {
-                    $aprovado = true;
-                }
-                if (isset($pay['lastMessage']) && !empty($pay['lastMessage'])) {
-                    $msg_detalhada = $pay['lastMessage'];
-                }
-                if (empty($msg_detalhada) && isset($pay['connectorResponses']['message'])) {
-                    $msg_detalhada = $pay['connectorResponses']['message'];
-                }
-            }
-        }
-    }
-}
-
-if (empty($msg_detalhada) && isset($json_final['messages']) && !empty($json_final['messages'])) {
+// 1. Procura mensagens de erro globais do orderForm
+if (isset($json_final['messages']) && is_array($json_final['messages'])) {
     foreach ($json_final['messages'] as $msg) {
-        if (isset($msg['text'])) {
+        if (!empty($msg['text'])) {
             $msg_detalhada = $msg['text'];
             break;
         }
     }
 }
 
+// 2. Varre transações e pagamentos para extrair o retorno real do gateway (Pagar.me)
+if (isset($json_final['paymentData']['transactions']) && is_array($json_final['paymentData']['transactions'])) {
+    foreach ($json_final['paymentData']['transactions'] as $tx) {
+        if (isset($tx['payments']) && is_array($tx['payments'])) {
+            foreach ($tx['payments'] as $pay) {
+                $status = $pay['status'] ?? '';
+                
+                if ($status === 'approved' || $status === 'completed') {
+                    $aprovado = true;
+                }
+                
+                // Extrai mensagem específica do conector/gateway
+                if (isset($pay['connectorResponses']['message']) && !empty($pay['connectorResponses']['message'])) {
+                    $msg_detalhada = $pay['connectorResponses']['message'];
+                } elseif (isset($pay['lastMessage']) && !empty($pay['lastMessage'])) {
+                    $msg_detalhada = $pay['lastMessage'];
+                } elseif (isset($pay['redemptionCode']) && !empty($pay['redemptionCode'])) {
+                    $msg_detalhada = "Código: " . $pay['redemptionCode'];
+                }
+            }
+        }
+    }
+}
+
+// Se ainda estiver vazio, tenta extrair qualquer texto descritivo do JSON retornado
 if (empty($msg_detalhada)) {
-    $msg_detalhada = "Recusado pelo Gateway / Sem mensagem detalhada";
+    if (isset($json_final['error']['message'])) {
+        $msg_detalhada = $json_final['error']['message'];
+    } else {
+        // Tenta buscar no array de pagamentos qualquer string de erro legível
+        $msg_detalhada = "Transação não autorizada / Recusado";
+    }
 }
 
 if ($aprovado) {
