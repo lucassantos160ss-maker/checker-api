@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// ✅ CHK DO PECINHA - TEMA PRETO, CINZA E BRANCO COM ANIMAÇÕES
+// ✅ CHK DO PECINHA - TEMA PRETO, CINZA E BRANCO (ANIMAÇÃO PREMIUM)
 // =====================================================
 
 session_start();
@@ -62,13 +62,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     $_SESSION['ultimo_status_gerado'] = $escolha;
 
     if ($escolha === 'LIVE_54') {
-        $html = "<span class='text-white font-bold bg-zinc-800 px-2 py-0.5 rounded border border-zinc-600 animate-pulse'>[LIVE]</span> <span class='text-zinc-200'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Código: 54 - Transação Aprovada com Sucesso</span>";
+        $html = "<span class='text-black font-extrabold bg-white px-2.5 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Código: 54 - Transação Aprovada com Sucesso</span>";
         echo json_encode(['status' => 'live', 'html' => $html]);
     } elseif ($escolha === 'LIVE_N7') {
-        $html = "<span class='text-white font-bold bg-zinc-800 px-2 py-0.5 rounded border border-zinc-600 animate-pulse'>[LIVE]</span> <span class='text-zinc-200'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Código: N7 - Aprovado (AVS Match / Testado com Sucesso)</span>";
+        $html = "<span class='text-black font-extrabold bg-white px-2.5 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Código: N7 - Aprovado (AVS Match / Testado com Sucesso)</span>";
         echo json_encode(['status' => 'live', 'html' => $html]);
     } else {
-        $html = "<span class='text-zinc-500 font-bold'>[DIE]</span> <span class='text-zinc-600'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Código: 14 - Cartão Inválido ou Recusado</span>";
+        $html = "<span class='text-zinc-600 font-bold'>[DIE]</span> <span class='text-zinc-600'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Código: 14 - Cartão Inválido ou Recusado</span>";
         echo json_encode(['status' => 'die', 'html' => $html]);
     }
     exit;
@@ -81,15 +81,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CHK DO PECINHA</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Biblioteca de Confetes para animar as Lives -->
+    <!-- Canvas Confetti Otimizado -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         @keyframes glow {
-            0%, 100% { box-shadow: 0 0 15px rgba(255, 255, 255, 0.05); }
-            50% { box-shadow: 0 0 25px rgba(255, 255, 255, 0.15); }
+            0%, 100% { box-shadow: 0 0 20px rgba(255, 255, 255, 0.03); }
+            50% { box-shadow: 0 0 35px rgba(255, 255, 255, 0.1); }
+        }
+        @keyframes flashLive {
+            0% { border-color: rgba(255, 255, 255, 1); background-color: rgba(255, 255, 255, 0.08); }
+            100% { border-color: rgba(39, 39, 42, 1); background-color: rgba(0, 0, 0, 0.4); }
+        }
+        @keyframes screenShake {
+            0%, 100% { transform: translate(0, 0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(2px, -2px); }
+            60% { transform: translate(-1px, -1px); }
+            80% { transform: translate(1px, 1px); }
         }
         .card-glow {
             animation: glow 4s infinite ease-in-out;
+        }
+        .live-flash-effect {
+            animation: flashLive 1.2s ease-out, screenShake 0.3s ease-in-out;
         }
     </style>
 </head>
@@ -126,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
 
     <?php else: ?>
         <!-- PAINEL PRINCIPAL -->
-        <div class="w-full max-w-2xl bg-zinc-900 p-6 sm:p-8 rounded-2xl shadow-2xl border border-zinc-800 card-glow">
+        <div id="mainPanel" class="w-full max-w-2xl bg-zinc-900 p-6 sm:p-8 rounded-2xl shadow-2xl border border-zinc-800 card-glow transition-all duration-300">
             <div class="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
                 <div class="flex items-center gap-3">
                     <img src="logo.png" alt="Logo Pecinha" class="h-12 w-12 object-cover rounded-full border border-zinc-700 shadow" onerror="this.style.display='none'">
@@ -161,14 +175,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
         </div>
 
         <script>
-            // Efeito de confetes especial monocromático/elegante para comemorar Live
-            function dispararEfeitoLive() {
-                confetti({
-                    particleCount: 50,
-                    spread: 60,
-                    origin: { y: 0.8 },
-                    colors: ['#ffffff', '#a1a1aa', '#52525b']
-                });
+            // Efeito de confetes profissional e fluido (explosão lateral dupla em tons monocromáticos)
+            function dispararConfeteLive() {
+                const count = 100;
+                const defaults = {
+                    origin: { y: 0.7 },
+                    colors: ['#ffffff', '#e4e4e7', '#a1a1aa', '#52525b'],
+                    zIndex: 9999
+                };
+
+                function fire(particleRatio, opts) {
+                    confetti(Object.assign({}, defaults, opts, {
+                        particleCount: Math.floor(count * particleRatio)
+                    }));
+                }
+
+                fire(0.25, { spread: 26, startVelocity: 55 });
+                fire(0.2, { spread: 60 });
+                fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+                fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+                fire(0.1, { spread: 120, startVelocity: 45 });
             }
 
             async function iniciarChecagem() {
@@ -176,6 +202,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                 const resDiv = document.getElementById('resultado');
                 const btn = document.getElementById('btnChecar');
                 const contador = document.getElementById('contador');
+                const panel = document.getElementById('mainPanel');
 
                 if (!texto) {
                     alert('Insira uma lista de cartões válida!');
@@ -202,23 +229,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                         });
                         let data = await response.json();
                         
-                        // Cria elemento animado para a linha nova
                         let itemDiv = document.createElement('div');
-                        itemDiv.className = "transition-all duration-300 transform translate-y-1 opacity-0 border-l-2 pl-2 py-0.5 " + (data.status === 'live' ? 'border-white bg-zinc-900/80' : 'border-zinc-800');
-                        itemDiv.innerHTML = data.html;
                         
+                        if (data.status === 'live') {
+                            // Estilo especial de destaque na linha quando dá Live
+                            itemDiv.className = "transition-all duration-500 transform translate-y-1 opacity-0 border-l-4 border-white bg-zinc-900/90 p-2 rounded-r shadow-lg live-flash-effect";
+                        } else {
+                            itemDiv.className = "transition-all duration-300 transform translate-y-1 opacity-0 border-l-2 border-zinc-800 pl-2 py-0.5";
+                        }
+
+                        itemDiv.innerHTML = data.html;
                         resDiv.appendChild(itemDiv);
                         
-                        // Força animação suave de entrada
                         setTimeout(() => {
                             itemDiv.classList.remove('translate-y-1', 'opacity-0');
                         }, 50);
 
                         resDiv.scrollTop = resDiv.scrollHeight;
 
-                        // Se for Live, dispara o efeito especial de confetes
+                        // Se for Live, dispara o efeito fluido de confetes e o flash no painel
                         if (data.status === 'live') {
-                            dispararEfeitoLive();
+                            dispararConfeteLive();
+                            panel.classList.add('live-flash-effect');
+                            setTimeout(() => {
+                                panel.classList.remove('live-flash-effect');
+                            }, 1200);
                         }
 
                     } catch (err) {
@@ -226,7 +261,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                     }
 
                     if (i < linhas.length - 1) {
-                        // Intervalo padrão aleatório entre 15 e 20 segundos (15000ms a 20000ms)
                         const randomDelay = Math.floor(Math.random() * (20000 - 15000 + 1)) + 15000;
                         await new Promise(resolve => setTimeout(resolve, randomDelay));
                     }
