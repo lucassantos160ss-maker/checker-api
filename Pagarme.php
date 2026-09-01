@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// ✅ CHECKER VTEX - CAPTURA DIRETA DE MENSAGEM DO GATEWAY
+// ✅ CHECKER VTEX - CAPTURA DE RETORNO DO PROCESSADOR
 // =====================================================
 define('BASE_URL', 'https://loja.umlivro.com.br');
 define('EMAIL', 'danielvitordeoliveiraconceicao@gmail.com');
@@ -136,21 +136,10 @@ $resp_payment = vtex_request(BASE_URL . "/api/checkout/pub/orderForm/" . $order_
 
 $json_final = json_decode($resp_payment, true);
 
-// Análise profunda do retorno da VTEX
 $aprovado = false;
 $msg_detalhada = "";
 
-// 1. Procura mensagens de erro globais do orderForm
-if (isset($json_final['messages']) && is_array($json_final['messages'])) {
-    foreach ($json_final['messages'] as $msg) {
-        if (!empty($msg['text'])) {
-            $msg_detalhada = $msg['text'];
-            break;
-        }
-    }
-}
-
-// 2. Varre transações e pagamentos para extrair o retorno real do gateway (Pagar.me)
+// Varredura cirúrgica focada nas respostas do adquirente/gateway
 if (isset($json_final['paymentData']['transactions']) && is_array($json_final['paymentData']['transactions'])) {
     foreach ($json_final['paymentData']['transactions'] as $tx) {
         if (isset($tx['payments']) && is_array($tx['payments'])) {
@@ -161,27 +150,31 @@ if (isset($json_final['paymentData']['transactions']) && is_array($json_final['p
                     $aprovado = true;
                 }
                 
-                // Extrai mensagem específica do conector/gateway
+                // Captura a mensagem do processador/gateway
                 if (isset($pay['connectorResponses']['message']) && !empty($pay['connectorResponses']['message'])) {
                     $msg_detalhada = $pay['connectorResponses']['message'];
+                } elseif (isset($pay['processorResponseMessage']) && !empty($pay['processorResponseMessage'])) {
+                    $msg_detalhada = $pay['processorResponseMessage'];
                 } elseif (isset($pay['lastMessage']) && !empty($pay['lastMessage'])) {
                     $msg_detalhada = $pay['lastMessage'];
-                } elseif (isset($pay['redemptionCode']) && !empty($pay['redemptionCode'])) {
-                    $msg_detalhada = "Código: " . $pay['redemptionCode'];
                 }
             }
         }
     }
 }
 
-// Se ainda estiver vazio, tenta extrair qualquer texto descritivo do JSON retornado
-if (empty($msg_detalhada)) {
-    if (isset($json_final['error']['message'])) {
-        $msg_detalhada = $json_final['error']['message'];
-    } else {
-        // Tenta buscar no array de pagamentos qualquer string de erro legível
-        $msg_detalhada = "Transação não autorizada / Recusado";
+// Se não achou na transação, procura nas mensagens gerais da VTEX
+if (empty($msg_detalhada) && isset($json_final['messages']) && is_array($json_final['messages'])) {
+    foreach ($json_final['messages'] as $msg) {
+        if (!empty($msg['text'])) {
+            $msg_detalhada = $msg['text'];
+            break;
+        }
     }
+}
+
+if (empty($msg_detalhada)) {
+    $msg_detalhada = "Transação não autorizada / Recusado";
 }
 
 if ($aprovado) {
