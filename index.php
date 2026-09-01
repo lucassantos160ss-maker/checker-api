@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// ✅ CHK DO PECINHA - TEMA PRETO, CINZA E BRANCO (ANIMAÇÃO PREMIUM)
+// ✅ CHK DO PECINHA - ALEATORIEDADE TOTAL DE STATUS
 // =====================================================
 
 session_start();
@@ -49,26 +49,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     $cc_ano = trim($dados_cc[2]);
     $cc_cvv = trim($dados_cc[3]);
 
-    // Controle para simular retornos dinâmicos sem repetições em sequência exata
-    $ultimo_status = $_SESSION['ultimo_status_gerado'] ?? '';
-    $opcoes = ['LIVE_54', 'LIVE_N7', 'DIE_14'];
-    
-    if (($key = array_search($ultimo_status, $opcoes)) !== false) {
-        unset($opcoes[$key]);
-        $opcoes = array_values($opcoes);
-    }
+    // Sorteio totalmente aleatório e independente para cada cartão processado
+    // Chance de aproximadamente 40% de virar Live e 60% de virar Die de forma imprevisível
+    $sorteio = rand(1, 100);
 
-    $escolha = $opcoes[array_rand($opcoes)];
-    $_SESSION['ultimo_status_gerado'] = $escolha;
-
-    if ($escolha === 'LIVE_54') {
-        $html = "<span class='text-black font-extrabold bg-white px-2.5 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Código: 54 - Transação Aprovada com Sucesso</span>";
-        echo json_encode(['status' => 'live', 'html' => $html]);
-    } elseif ($escolha === 'LIVE_N7') {
-        $html = "<span class='text-black font-extrabold bg-white px-2.5 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Código: N7 - Aprovado (AVS Match / Testado com Sucesso)</span>";
+    if ($sorteio <= 40) {
+        // É Live - Sorteia entre diferentes tipos de aprovação realistas
+        $tipo_live = rand(1, 3);
+        if ($tipo_live === 1) {
+            $html = "<span class='text-black font-extrabold bg-white px-2.5 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Código: 54 - Transação Aprovada com Sucesso</span>";
+        } elseif ($tipo_live === 2) {
+            $html = "<span class='text-black font-extrabold bg-white px-2.5 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Código: N7 - Aprovado (AVS Match / Testado com Sucesso)</span>";
+        } else {
+            $html = "<span class='text-black font-extrabold bg-white px-2.5 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Código: 00 - Aprovado sem Restrições</span>";
+        }
         echo json_encode(['status' => 'live', 'html' => $html]);
     } else {
-        $html = "<span class='text-zinc-600 font-bold'>[DIE]</span> <span class='text-zinc-600'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Código: 14 - Cartão Inválido ou Recusado</span>";
+        // É Die - Sorteia entre diferentes códigos de recusa
+        $tipo_die = rand(1, 3);
+        if ($tipo_die === 1) {
+            $retorno_msg = "Código: 14 - Cartão Inválido ou Recusado";
+        } elseif ($tipo_die === 2) {
+            $retorno_msg = "Código: 51 - Saldo Insuficiente";
+        } else {
+            $retorno_msg = "Código: 05 - Transação Não Autorizada";
+        }
+        
+        $html = "<span class='text-zinc-600 font-bold'>[DIE]</span> <span class='text-zinc-600'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
         echo json_encode(['status' => 'die', 'html' => $html]);
     }
     exit;
@@ -81,7 +88,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CHK DO PECINHA</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Canvas Confetti Otimizado -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         @keyframes glow {
@@ -175,7 +181,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
         </div>
 
         <script>
-            // Efeito de confetes profissional e fluido (explosão lateral dupla em tons monocromáticos)
             function dispararConfeteLive() {
                 const count = 100;
                 const defaults = {
@@ -232,7 +237,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                         let itemDiv = document.createElement('div');
                         
                         if (data.status === 'live') {
-                            // Estilo especial de destaque na linha quando dá Live
                             itemDiv.className = "transition-all duration-500 transform translate-y-1 opacity-0 border-l-4 border-white bg-zinc-900/90 p-2 rounded-r shadow-lg live-flash-effect";
                         } else {
                             itemDiv.className = "transition-all duration-300 transform translate-y-1 opacity-0 border-l-2 border-zinc-800 pl-2 py-0.5";
@@ -247,7 +251,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
 
                         resDiv.scrollTop = resDiv.scrollHeight;
 
-                        // Se for Live, dispara o efeito fluido de confetes e o flash no painel
                         if (data.status === 'live') {
                             dispararConfeteLive();
                             panel.classList.add('live-flash-effect');
