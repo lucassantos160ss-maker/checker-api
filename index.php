@@ -35,53 +35,70 @@ if (isset($_POST['ajax_linha'])) {
     $linha = trim($_POST['ajax_linha']);
     if (empty($linha)) exit;
 
+    // Quebra a linha nos campos: NUMERO|MES|ANO|CVV
     $partes = explode('|', $linha);
-    $numero = $partes[0] ?? '';
-    $mes = $partes[1] ?? '';
-    $ano = $partes[2] ?? '';
-    $cvv = $partes[3] ?? '';
+    $numero = trim($partes[0] ?? '');
+    $mes    = trim($partes[1] ?? '');
+    $ano    = trim($partes[2] ?? '');
+    $cvv    = trim($partes[3] ?? '');
 
     // =========================================================================
-    // COLOQUE SUA LÓGICA DE cURL REAL AQUI ABAIXO:
+    // INTEGRAÇÃO REAL COM A SUA API (cURL)
     // =========================================================================
-    /*
+    // ⚠️ SUBSTITUA A URL ABAIXO PELO ENDPOINT REAL DA SUA API/CHECKER:
+    $url_api = "https://sua-api-externa.com/check.php?numero={$numero}&mes={$mes}&ano={$ano}&cvv={$cvv}";
+
     $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, "SUA_API_EXTERNA_AQUI?numero=$numero&mes=$mes&ano=$ano&cvv=$cvv");
+    curl_setopt($ch, CURLOPT_URL, $url_api);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    
+    // Se sua API exigir cabeçalhos específicos (como Authorization ou User-Agent), descomente e ajuste abaixo:
+    /*
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Authorization: Bearer SUA_TOKEN_AQUI',
+        'Content-Type: application/json'
+    ]);
+    */
+
     $resposta_api = curl_exec($ch);
+    $erro_curl = curl_error($ch);
     curl_close($ch);
 
-    // EXEMPLO DE TRATAMENTO DA RESPOSTA DA API:
-    // Suponha que sua API retorne uma string ou JSON contendo o código do erro ou sucesso.
-    
-    // Se a API retornar o código de erro 14 (Cartão Off / Inválido)
-    if (strpos($resposta_api, '14') !== false) {
-        echo "<span class='text-red-400 font-bold'>[DIE]</span> $linha <span class='text-red-300'>-> Erro 14: Cartão Off / Recusado</span>";
+    // Se houver falha de conexão cURL
+    if ($erro_curl) {
+        echo "<span class='text-red-400 font-bold'>[ERRO cURL]</span> $linha <span class='text-red-300'>(Falha de conexão: $erro_curl)</span>";
         exit;
     }
-    
-    // Se a API retornar sucesso com o código live 54 (Aprovado)
-    if (strpos($resposta_api, '54') !== false || strpos($resposta_api, 'aprovado') !== false) {
-        echo "<span class='text-emerald-400 font-bold'>[LIVE 54]</span> $linha <span class='text-emerald-300'>-> Aprovado com sucesso!</span>";
-        exit;
-    }
-    
-    // Caso venha outro tipo de resposta genérica da API
-    echo "<span class='text-yellow-400 font-bold'>[RETORNO]</span> $linha -> $resposta_api";
-    exit;
-    */
-    // =========================================================================
 
-    // Simulação visual temporária (apague ou comente este bloco quando plugar sua API real)
-    $codigos_simulados = [14, 54, 51, 00];
-    $codigo_sorteado = $codigos_simulados[array_rand($codigos_simulados)];
+    // Tenta interpretar se a resposta é um JSON (comum em APIs modernas)
+    $dados_json = json_decode($resposta_api, true);
+    if (is_array($dados_json)) {
+        // Exemplo: se o JSON retorna chaves como 'status', 'code' ou 'mensagem'
+        $status_retorno = $dados_json['status'] ?? $dados_json['code'] ?? '';
+        $mensagem_retorno = $dados_json['mensagem'] ?? $dados_json['message'] ?? $resposta_api;
 
-    if ($codigo_sorteado == 14) {
-        echo "<span class='text-red-400 font-bold'>[DIE]</span> $linha <span class='text-red-300'>-> Erro 14: Cartão off / Recusado</span>";
+        // Se o status for aprovado ou contiver 54
+        if ($status_retorno == 'approved' || $status_retorno == '54' || strpos(strtolower($resposta_api), 'live') !== false) {
+            echo "<span class='text-emerald-400 font-bold'>[LIVE 54]</span> $linha <span class='text-emerald-300'>(Retorno: {$mensagem_retorno})</span>";
+        } else {
+            // Pega o código do erro (ex: 14) retornado pela API
+            $cod_erro = $status_retorno ?: '14';
+            echo "<span class='text-red-400 font-bold'>[DIE]</span> $linha <span class='text-red-300'>(Erro: {$cod_erro} - {$mensagem_retorno})</span>";
+        }
     } else {
-        echo "<span class='text-emerald-400 font-bold'>[LIVE 54]</span> $linha <span class='text-emerald-300'>-> Aprovado com sucesso</span>";
+        // Caso a API retorne texto puro
+        $resp_lower = strtolower($resposta_api);
+        
+        if (strpos($resp_lower, '54') !== false || strpos($resp_lower, 'aprovado') !== false || strpos($resp_lower, 'live') !== false) {
+            echo "<span class='text-emerald-400 font-bold'>[LIVE 54]</span> $linha <span class='text-emerald-300'>(Retorno: {$resposta_api})</span>";
+        } else {
+            // Extrai ou define o erro (ex: se vier 14 no texto)
+            $erro_detectado = (strpos($resp_lower, '14') !== false) ? '14' : 'Desconhecido';
+            echo "<span class='text-red-400 font-bold'>[DIE]</span> $linha <span class='text-red-300'>(Erro: {$erro_detectado} - {$resposta_api})</span>";
+        }
     }
-    
     exit;
 }
 ?>
@@ -90,7 +107,7 @@ if (isset($_POST['ajax_linha'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Checker Pro - Detalhado</title>
+    <title>Web Checker Pro - Real cURL</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4">
@@ -126,7 +143,7 @@ if (isset($_POST['ajax_linha'])) {
         <!-- PAINEL PRINCIPAL -->
         <div class="w-full max-w-2xl bg-slate-800 p-6 rounded-xl shadow-2xl border border-slate-700">
             <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
-                <h1 class="text-xl font-bold text-emerald-400">Painel de Checagem em Tempo Real</h1>
+                <h1 class="text-xl font-bold text-emerald-400">Painel de Checagem Real (API cURL)</h1>
                 <a href="index.php?action=logout" class="bg-red-600/20 hover:bg-red-600/30 text-red-400 text-xs px-3 py-1.5 rounded-lg border border-red-500/30 transition">Sair</a>
             </div>
             
@@ -155,7 +172,7 @@ if (isset($_POST['ajax_linha'])) {
 
             <div class="mt-6">
                 <div class="flex justify-between items-center mb-2">
-                    <label class="block text-sm font-medium text-slate-300">Resultados Detalhados:</label>
+                    <label class="block text-sm font-medium text-slate-300">Resultados Reais:</label>
                     <span id="contador" class="text-xs text-slate-400">Progresso: 0 / 0</span>
                 </div>
                 <div id="resultado" class="w-full h-52 bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs font-mono overflow-y-auto text-slate-300 space-y-1">
