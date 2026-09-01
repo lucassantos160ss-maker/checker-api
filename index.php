@@ -18,7 +18,8 @@ $ERRO_LOGIN = "";
 
 // Token fixo do Mercado Pago
 $MP_ACCESS_TOKEN = 'APP_USR-7217708500093011-090118-73a84adee3fb748b6be979c6ab6c133d';
-$PIX_API_URL = 'https://api.mercadopago.com/v1/payments';
+// Enviando o token via parâmetro na URL para evitar bloqueios de header do Render
+$PIX_API_URL = 'https://api.mercadopago.com/v1/payments?access_token=' . trim($MP_ACCESS_TOKEN);
 
 // Planos Disponíveis
 $PLANOS = [
@@ -123,7 +124,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
     curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0');
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer ' . trim($MP_ACCESS_TOKEN),
         'Content-Type: application/json',
         'X-Idempotency-Key: ' . uniqid('mp_', true)
     ]);
@@ -199,16 +199,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
         exit;
     }
 
-    $url_check = 'https://api.mercadopago.com/v1/payments/' . $payment_id;
+    $url_check = 'https://api.mercadopago.com/v1/payments/' . $payment_id . '?access_token=' . trim($MP_ACCESS_TOKEN);
 
     $ch = curl_init($url_check);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0');
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer ' . trim($MP_ACCESS_TOKEN)
-    ]);
 
     $response = curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
