@@ -138,7 +138,7 @@ if (isset($json_final['paymentData']['transactions'])) {
                     $aprovado = true;
                     $codigo = "54";
                     $mensagem = "Transação Aprovada com Sucesso";
-                    break 3;
+                    break 2;
                 } else if (!empty($last_message)) {
                     $mensagem = $last_message;
                 }
