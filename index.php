@@ -16,9 +16,8 @@ $CHAVES_INTERNAS = [
 $SENHA_MESTRE = "A4B9X2M7K1P8"; 
 $ERRO_LOGIN = "";
 
-// Token fixo do Mercado Pago (Chave API integrada com sucesso)
-$MP_ACCESS_TOKEN = 'APP_USR-7217708500093011-090118-73a84adee3fb748b6be979c6ab6c133d';
-// URL base corrigida (sem token na query string para evitar bloqueios de header)
+// Token fixo do Mercado Pago limpo de espaços
+$MP_ACCESS_TOKEN = trim('APP_USR-7217708500093011-090118-73a84adee3fb748b6be979c6ab6c133d');
 $PIX_API_URL = 'https://api.mercadopago.com/v1/payments';
 
 // Planos Disponíveis
@@ -94,7 +93,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     $email_final = !empty($email) ? $email : 'comprador_' . time() . '@gmail.com';
     $date_of_expiration = date('c', time() + 1200); 
 
-    // Tratamento seguro do nome e sobrenome
     $partes_nome = explode(' ', $nome);
     $first_name = !empty($partes_nome[0]) ? $partes_nome[0] : 'Cliente';
     $last_name = (count($partes_nome) > 1) ? end($partes_nome) : 'Pecinha';
@@ -123,10 +121,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
     curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0');
-    // Token enviado com segurança via cabeçalho HTTP Bearer
+    // ADICIONADO O CABEÇALHO DE AUTORIZAÇÃO OBRIGATÓRIO AQUI:
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/json',
-        'Authorization: Bearer ' . trim($MP_ACCESS_TOKEN),
+        'Authorization: Bearer ' . $MP_ACCESS_TOKEN,
         'X-Idempotency-Key: ' . uniqid('mp_', true)
     ]);
 
@@ -201,7 +199,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
         exit;
     }
 
-    // URL de checagem limpa, enviando o token via cabeçalho
     $url_check = 'https://api.mercadopago.com/v1/payments/' . $payment_id;
 
     $ch = curl_init($url_check);
@@ -210,7 +207,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0');
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer ' . trim($MP_ACCESS_TOKEN)
+        'Authorization: Bearer ' . $MP_ACCESS_TOKEN
     ]);
 
     $response = curl_exec($ch);
