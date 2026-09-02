@@ -136,7 +136,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
         $transactionId = $res_json['transactionId'] ?? '';
         $copia_cola = $res_json['copyPaste'] ?? '';
         
-        // Salva na sessão e também retorna para o JS garantir sincronia
         $_SESSION['transacao_ativa'] = [
             'id' => $transactionId,
             'plano' => $plano_id
@@ -159,12 +158,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     exit;
 }
 
-// Ajax: Checar Status do Pagamento (Corrigido para consultar corretamente a Elite Pay)
+// Ajax: Checar Status do Pagamento
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['acao'] === 'checar_status') {
     header('Content-Type: application/json');
     $payment_id = trim($_POST['payment_id'] ?? '');
     
-    // Se não veio por POST, tenta pegar da sessão
     if (empty($payment_id) && isset($_SESSION['transacao_ativa']['id'])) {
         $payment_id = $_SESSION['transacao_ativa']['id'];
     }
@@ -176,7 +174,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
         exit;
     }
 
-    // Endpoint correto conforme documentação padrão da Elite Pay
     $url_check = ELITE_BASE_URL . '/deposit/' . urlencode($payment_id);
 
     $ch = curl_init($url_check);
@@ -197,7 +194,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     $status_pago = false;
 
     if ($http_code >= 200 && $http_code < 300) {
-        // Varre múltiplos campos possíveis onde a API pode retornar o status da transação
         $st = strtoupper(
             $res_json['transactionState'] ?? 
             $res_json['status'] ?? 
@@ -205,7 +201,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
             $res_json['transaction']['status'] ?? ''
         );
 
-        // Aceita diversas variações de status pago da API
         if (in_array($st, ['COMPLETO', 'CONCLUIDO', 'PAGO', 'APROVADO', 'PAID', 'APPROVED', 'CONFIRMED', 'SUCCESS'])) {
             $status_pago = true;
         }
@@ -274,7 +269,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     usleep(mt_rand(2000000, 4000000));
 
     if ($status_site === 'success') {
-        $html = "<span class='text-black font-extrabold bg-purple-400 px-2 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Val: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
+        $html = "<span class='text-black font-extrabold theme-live-badge px-2 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Val: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
         echo json_encode(['status' => 'live', 'html' => $html]);
     } else {
         $html = "<span class='text-zinc-600 font-bold'>[DIE]</span> <span class='text-zinc-600'>Cartão: {$cc_num} | Val: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
@@ -283,8 +278,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     exit;
 }
 
-// Logo embutida em SVG puro
-$LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 100 100"><rect width="100" height="100" fill="#000"/><circle cx="50" cy="50" r="46" fill="#09090b" stroke="#9333ea" stroke-width="4"/><text x="50" y="62" font-family="monospace" font-size="45" font-weight="bold" fill="#c084fc" text-anchor="middle">P</text></svg>';
+// Logo embutida em SVG dinâmico
+$LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 100 100"><rect width="100" height="100" fill="#000"/><circle cx="50" cy="50" r="46" fill="#09090b" class="theme-logo-circle" stroke-width="4"/><text x="50" y="62" font-family="monospace" font-size="45" font-weight="bold" class="theme-logo-text" text-anchor="middle">P</text></svg>';
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -296,32 +291,89 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        @keyframes glow {
+        /* Variáveis de Temas */
+        body.theme-padrao {
+            --primary: #9333ea;
+            --primary-hover: #a855f7;
+            --primary-light: rgba(168, 85, 247, 0.15);
+            --border-theme: #7e22ce;
+            --badge-bg: #c084fc;
+        }
+        body.theme-prime {
+            --primary: #dc2626;
+            --primary-hover: #ef4444;
+            --primary-light: rgba(220, 38, 38, 0.15);
+            --border-theme: #b91c1c;
+            --badge-bg: #f87171;
+        }
+
+        @keyframes glow-padrao {
             0%, 100% { box-shadow: 0 0 20px rgba(168, 85, 247, 0.05); }
             50% { box-shadow: 0 0 35px rgba(168, 85, 247, 0.2); }
         }
-        .card-glow { animation: glow 4s infinite ease-in-out; }
+        @keyframes glow-prime {
+            0%, 100% { box-shadow: 0 0 20px rgba(220, 38, 38, 0.1); }
+            50% { box-shadow: 0 0 40px rgba(220, 38, 38, 0.35); }
+        }
+
+        body.theme-padrao .card-glow { animation: glow-padrao 4s infinite ease-in-out; }
+        body.theme-prime .card-glow { animation: glow-prime 4s infinite ease-in-out; }
+
+        /* Mapeamentos Dinâmicos para Classes Tailwind Personalizadas */
+        .theme-btn { background-color: var(--primary) !important; color: #ffffff !important; }
+        .theme-btn:hover { background-color: var(--primary-hover) !important; }
+        
+        .theme-border { border-color: var(--border-theme) !important; }
+        .theme-focus:focus { border-color: var(--primary) !important; }
+        
+        .theme-text { color: var(--primary-hover) !important; }
+        .theme-bg-soft { background-color: var(--primary-light) !important; }
+        
+        .theme-logo-circle { stroke: var(--primary) !important; }
+        .theme-logo-text { fill: var(--badge-bg) !important; }
+        .theme-live-badge { background-color: var(--badge-bg) !important; color: #000 !important; }
     </style>
+    <script>
+        // Carrega o tema salvo imediatamente para evitar flash de estilo incorreto
+        (function() {
+            const savedTheme = localStorage.getItem('pecinha_theme') || 'theme-padrao';
+            document.documentElement.className = savedTheme;
+            document.addEventListener('DOMContentLoaded', () => {
+                document.body.className = `bg-black text-zinc-100 min-h-screen flex items-center justify-center p-4 selection:bg-red-600 selection:text-white font-mono ${savedTheme}`;
+                const selectEl = document.getElementById('seletorTema');
+                if (selectEl) selectEl.value = savedTheme;
+            });
+        })();
+    </script>
 </head>
 <body class="bg-black text-zinc-100 min-h-screen flex items-center justify-center p-4 selection:bg-purple-600 selection:text-white font-mono">
+
+    <!-- SELETOR DE TEMA FLUTUANTE (CANTO SUPERIOR DIREITO) -->
+    <div class="fixed top-4 right-4 z-50 bg-zinc-900 border border-zinc-800 p-2 rounded-xl shadow-xl flex items-center gap-2">
+        <span class="text-[10px] text-zinc-400 uppercase tracking-widest pl-1">Tema:</span>
+        <select id="seletorTema" onchange="mudarTema(this.value)" class="bg-black border border-zinc-800 text-zinc-200 text-xs rounded-lg p-1.5 focus:outline-none theme-focus cursor-pointer">
+            <option value="theme-padrao">Padrão (Roxo)</option>
+            <option value="theme-prime">Prime (Branco & Vermelho)</option>
+        </select>
+    </div>
 
     <!-- TELA 1: LOGIN -->
     <?php if (!isset($_SESSION['logado']) && (!isset($_GET['view']) || $_GET['view'] !== 'comprar')): ?>
         <div class="w-full max-w-md bg-zinc-900 p-8 rounded-2xl shadow-2xl border border-zinc-800 text-center card-glow">
             <div class="mb-6 flex justify-center">
-                <div style="width: 110px; height: 110px; border-radius: 50%; overflow: hidden; border: 2px solid #9333ea; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); background-color: #000; display: flex; align-items: center; justify-content: center;">
+                <div class="theme-border" style="width: 110px; height: 110px; border-radius: 50%; overflow: hidden; border-width: 2px; border-style: solid; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); background-color: #000; display: flex; align-items: center; justify-content: center;">
                     <?php echo $LOGO_SVG_HTML; ?>
                 </div>
             </div>
             <h1 class="text-2xl font-bold mb-1 tracking-wider text-white">CHK DO PECINHA</h1>
-            <p class="text-xs text-purple-400 mb-4 uppercase tracking-widest">SISTEMA PREMIUM DE CHECKERS</p>
+            <p class="text-xs theme-text mb-4 uppercase tracking-widest">SISTEMA PREMIUM DE CHECKERS</p>
             
-            <div class="bg-purple-950/40 border border-purple-600/50 text-purple-300 p-3 rounded-xl mb-6 text-xs text-center leading-relaxed">
+            <div class="theme-bg-soft theme-border border text-zinc-200 p-3 rounded-xl mb-6 text-xs text-center leading-relaxed">
                 ⚡ <strong class="text-white">ALL BINS SYSTEM:</strong> Checker 100% otimizado para puxar <strong>LIVE</strong> em todas as matrizes globais de pagamento com alta assertividade.
             </div>
 
             <?php if (!empty($ERRO_LOGIN)): ?>
-                <div class="bg-zinc-800 border border-purple-900 text-purple-300 p-3 rounded-xl mb-4 text-xs">
+                <div class="bg-zinc-800 border theme-border text-zinc-200 p-3 rounded-xl mb-4 text-xs">
                     <?php echo $ERRO_LOGIN; ?>
                 </div>
             <?php endif; ?>
@@ -330,9 +382,9 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                 <input type="hidden" name="f_login" value="1">
                 <div class="mb-6 text-left">
                     <label class="block text-xs uppercase tracking-wider mb-2 text-zinc-400">Chave de Acesso:</label>
-                    <input type="text" name="chave" required class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-sm focus:outline-none focus:border-purple-600 text-zinc-200 uppercase tracking-widest text-center transition" placeholder="INSIRA SUA CHAVE">
+                    <input type="text" name="chave" required class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-sm focus:outline-none theme-focus text-zinc-200 uppercase tracking-widest text-center transition" placeholder="INSIRA SUA CHAVE">
                 </div>
-                <button type="submit" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition duration-200 shadow-lg text-xs uppercase tracking-widest mb-3">
+                <button type="submit" class="w-full theme-btn font-bold py-3 rounded-xl transition duration-200 shadow-lg text-xs uppercase tracking-widest mb-3">
                     Entrar no Sistema ➔
                 </button>
             </form>
@@ -348,7 +400,7 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
             <div class="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
                 <div>
                     <h1 class="text-xl font-bold text-white tracking-wide">CHK DO PECINHA</h1>
-                    <span class="text-xs text-purple-400">PLANOS PREMIUM DE ACESSO (ALL BINS)</span>
+                    <span class="text-xs theme-text">PLANOS PREMIUM DE ACESSO (ALL BINS)</span>
                 </div>
                 <a href="index.php" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs px-3 py-1.5 rounded-lg border border-zinc-700 transition">← Voltar</a>
             </div>
@@ -356,32 +408,32 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
             <div id="container-planos" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="bg-black border border-zinc-800 p-6 rounded-xl flex flex-col justify-between">
                     <div>
-                        <div class="text-xs text-purple-400 uppercase tracking-widest mb-1">📅 1 DIA</div>
+                        <div class="text-xs theme-text uppercase tracking-widest mb-1">📅 1 DIA</div>
                         <div class="text-3xl font-extrabold text-white mb-4">R$ 20<span class="text-sm font-normal text-zinc-500">,00</span></div>
                     </div>
-                    <button onclick="abrirCheckout('1', '20.00', '1 Dia')" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">Adquirir Agora</button>
+                    <button onclick="abrirCheckout('1', '20.00', '1 Dia')" class="w-full theme-btn font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">Adquirir Agora</button>
                 </div>
                 <div class="bg-black border border-zinc-800 p-6 rounded-xl flex flex-col justify-between">
                     <div>
-                        <div class="text-xs text-purple-400 uppercase tracking-widest mb-1">📅 7 DIAS</div>
+                        <div class="text-xs theme-text uppercase tracking-widest mb-1">📅 7 DIAS</div>
                         <div class="text-3xl font-extrabold text-white mb-4">R$ 100<span class="text-sm font-normal text-zinc-500">,00</span></div>
                     </div>
-                    <button onclick="abrirCheckout('7', '100.00', '7 Days')" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">Adquirir Agora</button>
+                    <button onclick="abrirCheckout('7', '100.00', '7 Days')" class="w-full theme-btn font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">Adquirir Agora</button>
                 </div>
-                <div class="bg-black border border-purple-600 p-6 rounded-xl flex flex-col justify-between relative">
-                    <span class="absolute -top-3 right-4 bg-purple-600 text-white text-[10px] px-2.5 py-0.5 rounded-full uppercase">Mais Vendido</span>
+                <div class="bg-black theme-border border p-6 rounded-xl flex flex-col justify-between relative">
+                    <span class="absolute -top-3 right-4 theme-btn text-white text-[10px] px-2.5 py-0.5 rounded-full uppercase">Mais Vendido</span>
                     <div>
-                        <div class="text-xs text-purple-400 uppercase tracking-widest mb-1">📅 15 DIAS</div>
+                        <div class="text-xs theme-text uppercase tracking-widest mb-1">📅 15 DIAS</div>
                         <div class="text-3xl font-extrabold text-white mb-4">R$ 180<span class="text-sm font-normal text-zinc-500">,00</span></div>
                     </div>
-                    <button onclick="abrirCheckout('15', '180.00', '15 Dias')" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">Adquirir Agora</button>
+                    <button onclick="abrirCheckout('15', '180.00', '15 Dias')" class="w-full theme-btn font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">Adquirir Agora</button>
                 </div>
                 <div class="bg-black border border-zinc-800 p-6 rounded-xl flex flex-col justify-between">
                     <div>
-                        <div class="text-xs text-purple-400 uppercase tracking-widest mb-1">📅 30 DIAS</div>
+                        <div class="text-xs theme-text uppercase tracking-widest mb-1">📅 30 DIAS</div>
                         <div class="text-3xl font-extrabold text-white mb-4">R$ 240<span class="text-sm font-normal text-zinc-500">,00</span></div>
                     </div>
-                    <button onclick="abrirCheckout('30', '240.00', '30 Dias')" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">Adquirir Agora</button>
+                    <button onclick="abrirCheckout('30', '240.00', '30 Dias')" class="w-full theme-btn font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">Adquirir Agora</button>
                 </div>
             </div>
 
@@ -392,21 +444,21 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                     
                     <div id="etapaForm">
                         <h2 class="text-lg font-bold text-white mb-1">Finalizar Compra</h2>
-                        <p id="detalhePlanoModal" class="text-xs text-purple-400 mb-4"></p>
+                        <p id="detalhePlanoModal" class="text-xs theme-text mb-4"></p>
                         
                         <form id="formPagamento" onsubmit="gerarPix(event)">
                             <input type="hidden" id="inputPlanoId">
                             <div class="space-y-3 mb-4">
                                 <div>
                                     <label class="block text-[11px] uppercase text-zinc-400 mb-1">Nome Completo</label>
-                                    <input type="text" id="cli_nome" required class="w-full bg-black border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" value="LUCAS DOS SANTOS PEREIRA">
+                                    <input type="text" id="cli_nome" required class="w-full bg-black border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 theme-focus focus:outline-none" value="LUCAS DOS SANTOS PEREIRA">
                                 </div>
                                 <div>
                                     <label class="block text-[11px] uppercase text-zinc-400 mb-1">CPF</label>
-                                    <input type="text" id="cli_cpf" required class="w-full bg-black border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" value="72115213416">
+                                    <input type="text" id="cli_cpf" required class="w-full bg-black border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 theme-focus focus:outline-none" value="72115213416">
                                 </div>
                             </div>
-                            <button type="submit" id="btnGerarPix" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">
+                            <button type="submit" id="btnGerarPix" class="w-full theme-btn font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">
                                 Gerar QR Code Pix ➔
                             </button>
                         </form>
@@ -414,7 +466,7 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
 
                     <div id="etapaPix" class="hidden text-center">
                         <h2 class="text-lg font-bold text-white mb-1">Escaneie o QR Code</h2>
-                        <p class="text-xs text-purple-400 mb-4">O sistema identificará o pagamento automaticamente</p>
+                        <p class="text-xs theme-text mb-4">O sistema identificará o pagamento automaticamente</p>
                         
                         <div class="bg-white p-3 rounded-xl inline-block mb-4 shadow-md flex justify-center items-center">
                             <div id="qrcodeContainer"></div>
@@ -434,10 +486,10 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                         <div class="text-3xl mb-2">🎉</div>
                         <h2 class="text-lg font-bold text-white mb-1">Pagamento Aprovado!</h2>
                         <div class="mb-4 text-left">
-                            <label class="block text-[11px] uppercase text-purple-400 mb-1 font-bold">Seu Código de Acesso:</label>
-                            <input type="text" id="inputChaveLiberada" readonly class="w-full bg-black border border-purple-600 rounded-xl p-3 text-sm text-white font-bold text-center tracking-widest select-all">
+                            <label class="block text-[11px] uppercase theme-text mb-1 font-bold">Seu Código de Acesso:</label>
+                            <input type="text" id="inputChaveLiberada" readonly class="w-full bg-black theme-border border rounded-xl p-3 text-sm text-white font-bold text-center tracking-widest select-all">
                         </div>
-                        <a href="index.php" class="block w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest text-center">
+                        <a href="index.php" class="block w-full theme-btn font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest text-center">
                             Fazer Login no Sistema ➔
                         </a>
                     </div>
@@ -509,7 +561,6 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                             document.getElementById('etapaForm').classList.add('hidden');
                             document.getElementById('etapaPix').classList.remove('hidden');
 
-                            // Inicia a checagem automática a cada 3 segundos
                             if (intervaloChecagem) clearInterval(intervaloChecagem);
                             intervaloChecagem = setInterval(checarStatusPagamento, 3000);
                         } else {
@@ -567,22 +618,22 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
         <div class="w-full max-w-6xl bg-zinc-900 p-6 sm:p-8 rounded-2xl shadow-2xl border border-zinc-800 card-glow">
             <div class="flex flex-col sm:flex-row justify-between items-center mb-6 border-b border-zinc-800 pb-4 gap-4">
                 <div class="flex items-center gap-3">
-                    <div style="width: 42px; height: 42px; border-radius: 50%; overflow: hidden; border: 1px solid #9333ea; background-color: #000; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                    <div class="theme-border" style="width: 42px; height: 42px; border-radius: 50%; overflow: hidden; border-width: 1px; border-style: solid; background-color: #000; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
                         <?php echo $LOGO_SVG_HTML; ?>
                     </div>
                     <div>
-                        <h1 class="text-xl font-bold text-white tracking-wide">CHK DO PECINHA <span class="text-xs bg-purple-600 text-white px-2 py-0.5 rounded ml-1">PRO</span></h1>
-                        <span class="text-xs text-purple-400">PAINEL OPERACIONAL DE CHECKERS & GERADOR GG</span>
+                        <h1 class="text-xl font-bold text-white tracking-wide">CHK DO PECINHA <span class="text-xs theme-btn px-2 py-0.5 rounded ml-1">PRO</span></h1>
+                        <span class="text-xs theme-text">PAINEL OPERACIONAL DE CHECKERS & GERADOR GG</span>
                     </div>
                 </div>
                 <div class="flex items-center gap-3 flex-wrap justify-end">
                     <div class="flex bg-black border border-zinc-800 rounded-xl p-1">
-                        <button onclick="mudarAba('checker')" id="tabBtnChecker" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-600 text-white transition">Checker</button>
+                        <button onclick="mudarAba('checker')" id="tabBtnChecker" class="px-3 py-1.5 rounded-lg text-xs font-bold theme-btn transition">Checker</button>
                         <button onclick="mudarAba('gerador')" id="tabBtnGerador" class="px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition">Gerador GG</button>
                     </div>
 
                     <div class="bg-black border border-zinc-800 px-3 py-1.5 rounded-lg text-xs text-zinc-300">
-                        Acesso: <span id="timerSessao" class="font-bold text-purple-400"><?php echo (isset($_SESSION['tipo_sessao']) && $_SESSION['tipo_sessao'] === 'infinita') ? 'INFINITA ♾️' : '24:00:00'; ?></span>
+                        Acesso: <span id="timerSessao" class="font-bold theme-text"><?php echo (isset($_SESSION['tipo_sessao']) && $_SESSION['tipo_sessao'] === 'infinita') ? 'INFINITA ♾️' : '24:00:00'; ?></span>
                     </div>
                     <a href="index.php?action=logout" class="bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-800 text-xs px-3 py-1.5 rounded-lg transition">Sair</a>
                 </div>
@@ -593,17 +644,17 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                 <div class="lg:col-span-4 space-y-4">
                     <div>
                         <label class="block text-xs uppercase tracking-wider text-zinc-400 mb-2">Lista de Cartões (CC|MM|AA|CVV):</label>
-                        <textarea id="listaCartoes" rows="10" class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-purple-600 resize-none font-mono" placeholder="400000|01|28|123"></textarea>
+                        <textarea id="listaCartoes" rows="10" class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none theme-focus resize-none font-mono" placeholder="400000|01|28|123"></textarea>
                     </div>
                     <div class="flex gap-2">
-                        <button onclick="iniciarChecker()" id="btnIniciar" class="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest shadow-lg">
+                        <button onclick="iniciarChecker()" id="btnIniciar" class="flex-1 theme-btn font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest shadow-lg">
                             Iniciar Teste
                         </button>
                         <button onclick="pararChecker()" id="btnParar" disabled class="bg-zinc-800 text-zinc-500 font-bold py-3 px-4 rounded-xl transition text-xs uppercase tracking-widest cursor-not-allowed">
                             Parar
                         </button>
                     </div>
-                    <button onclick="mudarAba('gerador')" class="w-full bg-zinc-800 hover:bg-zinc-700 text-purple-400 font-bold py-2.5 rounded-xl transition text-xs uppercase tracking-widest border border-zinc-700">
+                    <button onclick="mudarAba('gerador')" class="w-full bg-zinc-800 hover:bg-zinc-700 theme-text font-bold py-2.5 rounded-xl transition text-xs uppercase tracking-widest border border-zinc-700">
                         ⚡ Ir para o Gerador GG
                     </button>
                 </div>
@@ -614,9 +665,9 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                             <div class="text-[10px] text-zinc-500 uppercase">Testadas</div>
                             <div id="counterTestadas" class="text-lg font-bold text-white">0</div>
                         </div>
-                        <div class="bg-black border border-purple-900/50 p-3 rounded-xl">
-                            <div class="text-[10px] text-purple-400 uppercase">Aprovadas (Lives)</div>
-                            <div id="counterLives" class="text-lg font-bold text-purple-400">0</div>
+                        <div class="bg-black theme-border border p-3 rounded-xl">
+                            <div class="text-[10px] theme-text uppercase">Aprovadas (Lives)</div>
+                            <div id="counterLives" class="text-lg font-bold theme-text">0</div>
                         </div>
                         <div class="bg-black border border-zinc-800 p-3 rounded-xl">
                             <div class="text-[10px] text-zinc-500 uppercase">Reprovadas (Dies)</div>
@@ -627,10 +678,10 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <div class="flex justify-between items-center mb-1">
-                                <label class="text-[11px] uppercase tracking-wider text-purple-400 font-bold">🟢 Retorno Lives:</label>
+                                <label class="text-[11px] uppercase tracking-wider theme-text font-bold">🟢 Retorno Lives:</label>
                                 <button onclick="limparBloco('blocoLives')" class="text-[10px] text-zinc-500 hover:text-zinc-300">Limpar</button>
                             </div>
-                            <div id="blocoLives" class="w-full h-64 bg-black border border-purple-900/40 rounded-xl p-3 text-xs overflow-y-auto font-mono space-y-1"></div>
+                            <div id="blocoLives" class="w-full h-64 bg-black theme-border border rounded-xl p-3 text-xs overflow-y-auto font-mono space-y-1"></div>
                         </div>
                         <div>
                             <div class="flex justify-between items-center mb-1">
@@ -650,11 +701,11 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div>
                             <label class="block text-[11px] uppercase text-zinc-400 mb-1">BIN / Base do Cartão</label>
-                            <input type="text" id="genBin" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" placeholder="400000xxxxxxxxxx">
+                            <input type="text" id="genBin" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 theme-focus focus:outline-none" placeholder="400000xxxxxxxxxx">
                         </div>
                         <div>
                             <label class="block text-[11px] uppercase text-zinc-400 mb-1">Mês (Opcional)</label>
-                            <select id="genMes" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none">
+                            <select id="genMes" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 theme-focus focus:outline-none">
                                 <option value="rnd">Aleatório</option>
                                 <option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option>
                                 <option value="05">05</option><option value="06">06</option><option value="07">07</option><option value="08">08</option>
@@ -663,7 +714,7 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                         </div>
                         <div>
                             <label class="block text-[11px] uppercase text-zinc-400 mb-1">Ano (Opcional)</label>
-                            <select id="genAno" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none">
+                            <select id="genAno" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 theme-focus focus:outline-none">
                                 <option value="rnd">Aleatório</option>
                                 <option value="2026">2026</option><option value="2027">2027</option><option value="2028">2028</option><option value="2029">2029</option>
                                 <option value="2030">2030</option><option value="2031">2031</option><option value="2032">2032</option><option value="2033">2033</option>
@@ -674,18 +725,18 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
                             <label class="block text-[11px] uppercase text-zinc-400 mb-1">CVV (Opcional ou Rnd)</label>
-                            <input type="text" id="genCvv" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" placeholder="Deixe em branco para automático">
+                            <input type="text" id="genCvv" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 theme-focus focus:outline-none" placeholder="Deixe em branco para automático">
                         </div>
                         <div>
                             <label class="block text-[11px] uppercase text-zinc-400 mb-1">Quantidade</label>
-                            <input type="number" id="genQtd" value="10" min="1" max="100" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none">
+                            <input type="number" id="genQtd" value="10" min="1" max="100" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 theme-focus focus:outline-none">
                         </div>
                     </div>
                     <div class="flex gap-2">
-                        <button onclick="gerarCartoesGG()" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-2.5 px-6 rounded-xl transition text-xs uppercase tracking-widest">
+                        <button onclick="gerarCartoesGG()" class="theme-btn font-bold py-2.5 px-6 rounded-xl transition text-xs uppercase tracking-widest">
                             Gerar Cartões
                         </button>
-                        <button onclick="enviarGeradosParaChecker()" class="bg-zinc-800 hover:bg-zinc-700 text-purple-400 font-bold py-2.5 px-6 rounded-xl transition text-xs uppercase tracking-widest border border-zinc-700">
+                        <button onclick="enviarGeradosParaChecker()" class="bg-zinc-800 hover:bg-zinc-700 theme-text font-bold py-2.5 px-6 rounded-xl transition text-xs uppercase tracking-widest border border-zinc-700">
                             Enviar para o Checker ➔
                         </button>
                     </div>
@@ -693,12 +744,18 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
 
                 <div>
                     <label class="block text-xs uppercase tracking-wider text-zinc-400 mb-2">Resultado da Geração:</label>
-                    <textarea id="resultadoGerador" rows="8" class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-purple-600 resize-none font-mono" readonly></textarea>
+                    <textarea id="resultadoGerador" rows="8" class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none theme-focus resize-none font-mono" readonly></textarea>
                 </div>
             </div>
         </div>
 
         <script>
+            function mudarTema(tema) {
+                document.documentElement.className = tema;
+                document.body.className = `bg-black text-zinc-100 min-h-screen flex items-center justify-center p-4 selection:bg-red-600 selection:text-white font-mono ${tema}`;
+                localStorage.setItem('pecinha_theme', tema);
+            }
+
             function mudarAba(aba) {
                 const secChecker = document.getElementById('secaoChecker');
                 const secGerador = document.getElementById('secaoGerador');
@@ -708,12 +765,12 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                 if (aba === 'checker') {
                     secChecker.classList.remove('hidden');
                     secGerador.classList.add('hidden');
-                    btnChecker.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-600 text-white transition";
+                    btnChecker.className = "px-3 py-1.5 rounded-lg text-xs font-bold theme-btn transition";
                     btnGerador.className = "px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition";
                 } else {
                     secChecker.classList.add('hidden');
                     secGerador.classList.remove('hidden');
-                    btnGerador.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-600 text-white transition";
+                    btnGerador.className = "px-3 py-1.5 rounded-lg text-xs font-bold theme-btn transition";
                     btnChecker.className = "px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition";
                 }
             }
@@ -820,7 +877,7 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                 document.getElementById('btnIniciar').disabled = true;
                 document.getElementById('btnIniciar').className = "flex-1 bg-zinc-800 text-zinc-500 font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest cursor-not-allowed";
                 document.getElementById('btnParar').disabled = false;
-                document.getElementById('btnParar').className = "bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-4 rounded-xl transition text-xs uppercase tracking-widest";
+                document.getElementById('btnParar').className = "theme-btn font-bold py-3 px-4 rounded-xl transition text-xs uppercase tracking-widest";
 
                 let index = 0;
 
@@ -884,7 +941,7 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                     timeoutCheckerHandle = null;
                 }
                 document.getElementById('btnIniciar').disabled = false;
-                document.getElementById('btnIniciar').className = "flex-1 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest shadow-lg";
+                document.getElementById('btnIniciar').className = "flex-1 theme-btn font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest shadow-lg";
                 document.getElementById('btnParar').disabled = true;
                 document.getElementById('btnParar').className = "bg-zinc-800 text-zinc-500 font-bold py-3 px-4 rounded-xl transition text-xs uppercase tracking-widest cursor-not-allowed";
             }
