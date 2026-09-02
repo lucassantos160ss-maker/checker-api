@@ -237,6 +237,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     $cc_cvv = trim($dados_cc[3]);
 
     $prefixo_bin = substr(preg_replace('/\D/', '', $cc_num), 0, 6);
+    $limpa_bin_inicial = preg_replace('/\D/', '', $cc_num);
+    $ehAmex = (substr($limpa_bin_inicial, 0, 2) === '34' || substr($limpa_bin_inicial, 0, 2) === '37');
+
     $forcar_erro_14 = in_array($prefixo_bin, ['406669', '406655']);
 
     mt_srand();
@@ -258,12 +261,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     } else {
         $status_site = 'success';
         $valor_debitado = number_format(mt_rand(100, 2300) / 100, 2, ',', '.');
-        $retornos_lives = [
-            "1001 live - Aprovado com sucesso / Debitado R$ {$valor_debitado}",
-            "1001 live - Transação aprovada (R$ {$valor_debitado} cobrado)",
-            "1001 live - Aprovado (R$ {$valor_debitado})"
-        ];
-        $retorno_msg = $retornos_lives[array_rand($retornos_lives)];
+        
+        if ($ehAmex) {
+            $retorno_msg = "000 live - Aprovado com sucesso / Debitado R$ {$valor_debitado}";
+        } else {
+            $retornos_lives = [
+                "1001 live - Aprovado com sucesso / Debitado R$ {$valor_debitado}",
+                "1001 live - Transação aprovada (R$ {$valor_debitado} cobrado)",
+                "1001 live - Aprovado (R$ {$valor_debitado})"
+            ];
+            $retorno_msg = $retornos_lives[array_rand($retornos_lives)];
+        }
     }
 
     usleep(mt_rand(2000000, 4000000));
@@ -291,7 +299,7 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        /* Variáveis de Temas (Tema Prime agora com fundo totalmente escuro/preto fosco e detalhes em Vermelho Sangue / Neon Red) */
+        /* Variáveis de Temas (Tema Prime com fundo totalmente escuro/preto fosco e detalhes em Vermelho Sangue / Neon Red) */
         body.theme-padrao {
             --bg-base: #000000;
             --panel-bg: #09090b;
