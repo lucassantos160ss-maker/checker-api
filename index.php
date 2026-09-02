@@ -193,7 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     exit;
 }
 
-// Ajax: Checker de Cartões (Comportamento realista e taxa de aprovação ~15%)
+// Ajax: Checker de Cartões (Comportamento realista e taxa de aprovação ~15% - 20 a 25 segundos)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     header('Content-Type: application/json');
     if (!isset($_SESSION['logado'])) {
@@ -234,8 +234,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
         $retorno_msg = $tipos_live[array_rand($tipos_live)];
     }
 
-    // Simula tempo de resposta de processamento real na matriz
-    usleep(mt_rand(400000, 900000));
+    // Aguarda entre 20 a 25 segundos por checagem (20000000 a 25000000 microssegundos)
+    usleep(mt_rand(20000000, 25000000));
 
     if ($status_site === 'success') {
         $html = "<span class='text-black font-extrabold bg-purple-400 px-2 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Val: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
