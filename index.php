@@ -23,7 +23,7 @@ define('ELITE_BASE_URL', 'https://api.elitepaybr.com/api/v1');
 
 // Planos Disponíveis
 $PLANOS = [
-    '1'  => ['dias' => 1,  'segundos' => 86400,   'nome' => '1 Dia',  'valor' => 20.00],
+    '1'  => ['dias' => 1,  'segundos' => 86400,    'nome' => '1 Dia',  'valor' => 20.00],
     '7'  => ['dias' => 7,  'segundos' => 604800,  'nome' => '7 Days', 'valor' => 100.00],
     '15' => ['dias' => 15, 'segundos' => 1296000, 'nome' => '15 Dias', 'valor' => 180.00],
     '30' => ['dias' => 30, 'segundos' => 2592000, 'nome' => '30 Dias', 'valor' => 240.00],
@@ -595,20 +595,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                                 <label class="text-[11px] uppercase tracking-wider text-purple-400 font-bold">🟢 Retorno Lives:</label>
                                 <button onclick="limparBloco('blocoLives')" class="text-[10px] text-zinc-500 hover:text-zinc-300">Limpar</button>
                             </div>
-                            <div id="blocoLives" class="bg-black border border-purple-900/40 rounded-xl p-3 h-64 overflow-y-auto space-y-2 text-xs font-mono">
-                                <div class="text-zinc-600 italic">Aguardando lives...</div>
-                            </div>
+                            <div id="blocoLives" class="w-full h-64 bg-black border border-purple-900/40 rounded-xl p-3 text-xs overflow-y-auto font-mono space-y-1"></div>
                         </div>
-
                         <!-- Bloco Direito: Dies -->
                         <div>
                             <div class="flex justify-between items-center mb-1">
                                 <label class="text-[11px] uppercase tracking-wider text-zinc-500 font-bold">🔴 Retorno Dies:</label>
                                 <button onclick="limparBloco('blocoDies')" class="text-[10px] text-zinc-500 hover:text-zinc-300">Limpar</button>
                             </div>
-                            <div id="blocoDies" class="bg-black border border-zinc-800 rounded-xl p-3 h-64 overflow-y-auto space-y-2 text-xs font-mono">
-                                <div class="text-zinc-600 italic">Aguardando dies...</div>
-                            </div>
+                            <div id="blocoDies" class="w-full h-64 bg-black border border-zinc-800 rounded-xl p-3 text-xs overflow-y-auto font-mono space-y-1 text-zinc-500"></div>
                         </div>
                     </div>
                 </div>
@@ -616,173 +611,190 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
 
             <!-- SEÇÃO 2: GERADOR GG INTEGRADO -->
             <div id="secaoGerador" class="hidden space-y-6">
-                <div class="bg-black border border-zinc-800 p-6 rounded-2xl">
-                    <h2 class="text-lg font-bold text-white mb-1">GERADOR GG</h2>
-                    <p class="text-xs text-purple-400 mb-4">* Utilize com moderação;</p>
-                    
+                <div class="bg-black border border-zinc-800 p-6 rounded-xl">
+                    <h2 class="text-sm font-bold text-white mb-4 uppercase tracking-wider">⚡ Gerador de Cartões (GG)</h2>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div>
-                            <label class="block text-[11px] uppercase text-purple-400 font-bold mb-1">Bins</label>
-                            <input type="text" id="genBin" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" placeholder="374769 ou 400000">
+                            <label class="block text-[11px] uppercase text-zinc-400 mb-1">BIN / Base do Cartão</label>
+                            <input type="text" id="genBin" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" placeholder="400000xxxxxxxxxx">
                         </div>
                         <div>
-                            <label class="block text-[11px] uppercase text-purple-400 font-bold mb-1">Data</label>
-                            <div class="grid grid-cols-2 gap-2">
-                                <select id="genMes" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none">
-                                    <option value="rnd">MÊS</option>
-                                    <option value="01">01 - Janeiro</option>
-                                    <option value="02">02 - Fevereiro</option>
-                                    <option value="03">03 - Março</option>
-                                    <option value="04">04 - Abril</option>
-                                    <option value="05">05 - Maio</option>
-                                    <option value="06">06 - Junho</option>
-                                    <option value="07">07 - Julho</option>
-                                    <option value="08">08 - Agosto</option>
-                                    <option value="09">09 - Setembro</option>
-                                    <option value="10">10 - Outubro</option>
-                                    <option value="11">11 - Novembro</option>
-                                    <option value="12">12 - Dezembro</option>
-                                </select>
-                                <select id="genAno" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none">
-                                    <option value="rnd">ANO</option>
-                                    <option value="2026">2026</option>
-                                    <option value="2027">2027</option>
-                                    <option value="2028">2028</option>
-                                    <option value="2029">2029</option>
-                                    <option value="2030">2030</option>
-                                    <option value="2031">2031</option>
-                                    <option value="2032">2032</option>
-                                    <option value="2033">2033</option>
-                                    <option value="2034">2034</option>
-                                    <option value="2035">2035</option>
-                                </select>
-                            </div>
+                            <label class="block text-[11px] uppercase text-zinc-400 mb-1">Mês (Opcional)</label>
+                            <select id="genMes" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none">
+                                <option value="rnd">Aleatório</option>
+                                <option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option>
+                                <option value="05">05</option><option value="06">06</option><option value="07">07</option><option value="08">08</option>
+                                <option value="09">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option>
+                            </select>
                         </div>
                         <div>
-                            <label class="block text-[11px] uppercase text-purple-400 font-bold mb-1">CVV</label>
-                            <input type="text" id="genCvv" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" placeholder="rnd (Amex usa 4 digitos)">
+                            <label class="block text-[11px] uppercase text-zinc-400 mb-1">Ano (Opcional)</label>
+                            <select id="genAno" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none">
+                                <option value="rnd">Aleatório</option>
+                                <option value="2027">2027</option>
+                                <option value="2028">2028</option>
+                                <option value="2029">2029</option>
+                                <option value="2030">2030</option>
+                                <option value="2031">2031</option>
+                            </select>
                         </div>
                     </div>
-
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
-                            <label class="block text-[11px] uppercase text-purple-400 font-bold mb-1">Quantidade</label>
-                            <input type="number" id="genQtd" value="10" min="1" max="100" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none">
+                            <label class="block text-[11px] uppercase text-zinc-400 mb-1">CVV (Opcional ou Rnd)</label>
+                            <input type="text" id="genCvv" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" placeholder="Deixe em branco para aleatório ou digite ex: rnd">
                         </div>
-                        <div class="flex items-end">
-                            <button onclick="gerarCartoesGG()" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">
-                                Gerar Cartões
-                            </button>
+                        <div>
+                            <label class="block text-[11px] uppercase text-zinc-400 mb-1">Quantidade</label>
+                            <input type="number" id="genQtd" value="10" min="1" max="100" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none">
                         </div>
                     </div>
-
-                    <div>
-                        <div class="flex justify-between items-center mb-1">
-                            <label class="text-[11px] uppercase tracking-wider text-purple-400 font-bold">Cartões Gerados:</label>
-                            <div class="flex gap-2">
-                                <button onclick="copiarGG()" class="text-xs bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1 rounded-lg border border-zinc-700 transition">Copiar GG</button>
-                                <button onclick="enviarParaChecker()" class="text-xs bg-purple-700 hover:bg-purple-600 text-white px-3 py-1 rounded-lg transition font-bold">Enviar para o Checker ➔</button>
-                            </div>
-                        </div>
-                        <textarea id="resultadoGerador" rows="8" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-300 focus:outline-none resize-none font-mono" placeholder="Os cartões gerados aparecerão aqui..."></textarea>
+                    <div class="flex gap-2">
+                        <button onclick="gerarCartoesGG()" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-2.5 px-6 rounded-xl transition text-xs uppercase tracking-widest">
+                            Gerar Cartões
+                        </button>
+                        <button onclick="enviarGeradosParaChecker()" class="bg-zinc-800 hover:bg-zinc-700 text-purple-400 font-bold py-2.5 px-6 rounded-xl transition text-xs uppercase tracking-widest border border-zinc-700">
+                            Enviar para o Checker ➔
+                        </button>
                     </div>
                 </div>
+
+                <div>
+                    <label class="block text-xs uppercase tracking-wider text-zinc-400 mb-2">Resultado da Geração:</label>
+                    <textarea id="resultadoGerador" rows="8" class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-purple-600 resize-none font-mono" readonly></textarea>
+                </div>
             </div>
+        </div>
 
-            <script>
-                // Lógica de Navegação de Abas Internas (Checker / Gerador)
-                function mudarAba(aba) {
-                    const secaoChecker = document.getElementById('secaoChecker');
-                    const secaoGerador = document.getElementById('secaoGerador');
-                    const tabBtnChecker = document.getElementById('tabBtnChecker');
-                    const tabBtnGerador = document.getElementById('tabBtnGerador');
+        <script>
+            // Sistema de Abas (Checker vs Gerador)
+            function mudarAba(aba) {
+                const secChecker = document.getElementById('secaoChecker');
+                const secGerador = document.getElementById('secaoGerador');
+                const btnChecker = document.getElementById('tabBtnChecker');
+                const btnGerador = document.getElementById('tabBtnGerador');
 
-                    if (aba === 'checker') {
-                        secaoChecker.classList.remove('hidden');
-                        secaoGerador.classList.add('hidden');
-                        tabBtnChecker.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-600 text-white transition";
-                        tabBtnGerador.className = "px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition";
-                    } else {
-                        secaoChecker.classList.add('hidden');
-                        secaoGerador.classList.remove('hidden');
-                        tabBtnGerador.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-600 text-white transition";
-                        tabBtnChecker.className = "px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition";
+                if (aba === 'checker') {
+                    secChecker.classList.remove('hidden');
+                    secGerador.classList.add('hidden');
+                    btnChecker.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-600 text-white transition";
+                    btnGerador.className = "px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition";
+                } else {
+                    secChecker.classList.add('hidden');
+                    secGerador.classList.remove('hidden');
+                    btnGerador.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-600 text-white transition";
+                    btnChecker.className = "px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition";
+                }
+            }
+
+            // Lógica do Cronômetro de Sessão (24h)
+            let tempoRestanteSegundos = 86400;
+            const timerElement = document.getElementById('timerSessao');
+            if (timerElement) {
+                setInterval(() => {
+                    if (tempoRestanteSegundos > 0) {
+                        tempoRestanteSegundos--;
+                        let h = Math.floor(tempoRestanteSegundos / 3600);
+                        let m = Math.floor((tempoRestanteSegundos % 3600) / 60);
+                        let s = tempoRestanteSegundos % 60;
+                        timerElement.innerText = 
+                            String(h).padStart(2, '0') + ':' + 
+                            String(m).padStart(2, '0') + ':' + 
+                            String(s).padStart(2, '0');
                     }
+                }, 1000);
+            }
+
+            // Gerador GG Lógica
+            function gerarCartoesGG() {
+                let bin = document.getElementById('genBin').value.trim();
+                let mesOpt = document.getElementById('genMes').value;
+                let anoOpt = document.getElementById('genAno').value;
+                let cvvOpt = document.getElementById('genCvv').value.trim();
+                let qtd = parseInt(document.getElementById('genQtd').value) || 10;
+
+                if (!bin) {
+                    alert('Digite uma BIN ou base de cartão!');
+                    return;
                 }
 
-                // Lógica do Cronômetro de Sessão (24h)
-                let tempoRestante = 86400;
-                function atualizarTimer() {
-                    const horas = Math.floor(tempoRestante / 3600);
-                    const minutos = Math.floor((tempoRestante % 3600) / 60);
-                    const segundos = tempoRestante % 60;
-                    document.getElementById('timerSessao').innerText = 
-                        String(horas).padStart(2, '0') + ':' + 
-                        String(minutos).padStart(2, '0') + ':' + 
-                        String(segundos).padStart(2, '0');
-                    if (tempoRestante > 0) {
-                        tempoRestante--;
+                let listaGerada = [];
+                for (let i = 0; i < qtd; i++) {
+                    let cartaoTemp = bin;
+                    // Preenche com números aleatórios se tiver 'x' ou 'X' ou completa até 16 dígitos
+                    cartaoTemp = cartaoTemp.replace(/[xX]/g, () => Math.floor(Math.random() * 10));
+                    while (cartaoTemp.length < 16) {
+                        cartaoTemp += Math.floor(Math.random() * 10);
                     }
-                }
-                setInterval(atualizarTimer, 1000);
+                    cartaoTemp = cartaoTemp.substring(0, 16);
 
-                // Variáveis do Checker
-                let checkerRodando = false;
-                let listaDeCartoesParaTestar = [];
-                let indexAtualCartao = 0;
+                    let mes = mesOpt === 'rnd' ? String(Math.floor(Math.random() * 12) + 1).padStart(2, '0') : mesOpt;
+                    let ano = anoOpt === 'rnd' ? String(Math.floor(Math.random() * 5) + 2027) : anoOpt;
+                    let cvv = !cvvOpt || cvvOpt.toLowerCase() === 'rnd' ? String(Math.floor(Math.random() * 900) + 100) : cvvOpt;
 
-                function iniciarChecker() {
-                    const texto = document.getElementById('listaCartoes').value.trim();
-                    if (!texto) {
-                        alert('Insira pelo menos um cartão na lista!');
-                        return;
-                    }
-
-                    listaDeCartoesParaTestar = texto.split('\n').map(c => c.trim()).filter(c => c.length > 0);
-                    if (listaDeCartoesParaTestar.length === 0) return;
-
-                    checkerRodando = true;
-                    indexAtualCartao = 0;
-
-                    document.getElementById('btnIniciar').disabled = true;
-                    document.getElementById('btnIniciar').classList.add('opacity-50', 'cursor-not-allowed');
-                    document.getElementById('btnParar').disabled = false;
-                    document.getElementById('btnParar').classList.remove('bg-zinc-800', 'text-zinc-500', 'cursor-not-allowed');
-                    document.getElementById('btnParar').classList.add('bg-red-600', 'hover:bg-red-500', 'text-white');
-
-                    // Limpa avisos vazios iniciais
-                    if (document.getElementById('blocoLives').innerHTML.includes('Aguardando lives...')) {
-                        document.getElementById('blocoLives').innerHTML = '';
-                    }
-                    if (document.getElementById('blocoDies').innerHTML.includes('Aguardando dies...')) {
-                        document.getElementById('blocoDies').innerHTML = '';
-                    }
-
-                    processarProximoCartao();
+                    listaGerada.push(`${cartaoTemp}|${mes}|${ano}|${cvv}`);
                 }
 
-                function pararChecker() {
-                    checkerRodando = false;
-                    document.getElementById('btnIniciar').disabled = false;
-                    document.getElementById('btnIniciar').classList.remove('opacity-50', 'cursor-not-allowed');
-                    document.getElementById('btnParar').disabled = true;
-                    document.getElementById('btnParar').classList.add('bg-zinc-800', 'text-zinc-500', 'cursor-not-allowed');
-                    document.getElementById('btnParar').classList.remove('bg-red-600', 'hover:bg-red-500', 'text-white');
+                document.getElementById('resultadoGerador').value = listaGerada.join('\n');
+            }
+
+            function enviarGeradosParaChecker() {
+                let gerados = document.getElementById('resultadoGerador').value;
+                if (!gerados) {
+                    alert('Gere alguns cartões primeiro!');
+                    return;
+                }
+                document.getElementById('listaCartoes').value = gerados;
+                mudarAba('checker');
+            }
+
+            function limparBloco(idBloco) {
+                document.getElementById(idBloco).innerHTML = '';
+                if (idBloco === 'blocoLives') {
+                    document.getElementById('counterLives').innerText = '0';
+                } else {
+                    document.getElementById('counterDies').innerText = '0';
+                }
+                document.getElementById('counterTestadas').innerText = '0';
+            }
+
+            // Controle do Checker com intervalo de 17 a 29 segundos entre os cartões
+            let rodandoChecker = false;
+            let timeoutCheckerHandle = null;
+
+            async function iniciarChecker() {
+                const textarea = document.getElementById('listaCartoes');
+                const linhas = textarea.value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+                if (linhas.length === 0) {
+                    alert('Insira uma lista de cartões para testar!');
+                    return;
                 }
 
-                async function processarProximoCartao() {
-                    if (!checkerRodando || indexAtualCartao >= listaDeCartoesParaTestar.length) {
+                rodandoChecker = true;
+                document.getElementById('btnIniciar').disabled = true;
+                document.getElementById('btnIniciar').className = "flex-1 bg-zinc-800 text-zinc-500 font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest cursor-not-allowed";
+                document.getElementById('btnParar').disabled = false;
+                document.getElementById('btnParar').className = "bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-4 rounded-xl transition text-xs uppercase tracking-widest";
+
+                let index = 0;
+
+                async function testarProximo() {
+                    if (!rodandoChecker || index >= linhas.length) {
                         pararChecker();
                         return;
                     }
 
-                    const cartao = listaDeCartoesParaTestar[indexAtualCartao];
-                    indexAtualCartao++;
+                    let linhaAtual = linhas[index];
+                    index++;
 
-                    const formData = new URLSearchParams();
-                    formData.append('lista', cartao);
+                    // Remove a linha testada do textarea para ir limpando a fila
+                    textarea.value = linhas.slice(index).join('\n');
 
                     try {
+                        const formData = new URLSearchParams();
+                        formData.append('lista', linhaAtual);
+
                         const response = await fetch('index.php', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -790,119 +802,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                         });
                         const data = await response.json();
 
-                        // Atualiza contador de testadas
-                        const testadasEl = document.getElementById('counterTestadas');
+                        let testadasEl = document.getElementById('counterTestadas');
                         testadasEl.innerText = parseInt(testadasEl.innerText) + 1;
 
                         if (data.status === 'live') {
-                            const livesEl = document.getElementById('counterLives');
+                            let livesEl = document.getElementById('counterLives');
                             livesEl.innerText = parseInt(livesEl.innerText) + 1;
-
-                            const bloco = document.getElementById('blocoLives');
-                            const div = document.createElement('div');
-                            div.innerHTML = data.html;
-                            bloco.prepend(div);
+                            let bloco = document.getElementById('blocoLives');
+                            bloco.innerHTML += `<div class="py-0.5">${data.html}</div>`;
+                            bloco.scrollTop = bloco.scrollHeight;
                         } else {
-                            const diesEl = document.getElementById('counterDies');
+                            let diesEl = document.getElementById('counterDies');
                             diesEl.innerText = parseInt(diesEl.innerText) + 1;
-
-                            const bloco = document.getElementById('blocoDies');
-                            const div = document.createElement('div');
-                            div.innerHTML = data.html;
-                            bloco.prepend(div);
+                            let bloco = document.getElementById('blocoDies');
+                            bloco.innerHTML += `<div class="py-0.5">${data.html}</div>`;
+                            bloco.scrollTop = bloco.scrollHeight;
                         }
-                    } catch (e) {
-                        console.error(e);
+                    } catch (err) {
+                        console.error('Erro no teste:', err);
                     }
 
-                    if (checkerRodando) {
-                        setTimeout(processarProximoCartao, 500);
+                    if (rodandoChecker && index < linhas.length) {
+                        // Sorteia um tempo aleatório entre 17 e 29 segundos (convertido para milissegundos: 17000 a 29000)
+                        let tempoEsperaMs = Math.floor(Math.random() * (29000 - 17000 + 1)) + 17000;
+                        timeoutCheckerHandle = setTimeout(testarProximo, tempoEsperaMs);
+                    } else {
+                        pararChecker();
                     }
                 }
 
-                function limparBloco(idBloco) {
-                    const msg = idBloco === 'blocoLives' ? 'Aguardando lives...' : 'Aguardando dies...';
-                    document.getElementById(idBloco).innerHTML = `<div class="text-zinc-600 italic">${msg}</div>`;
+                testarProximo();
+            }
+
+            function pararChecker() {
+                rodandoChecker = false;
+                if (timeoutCheckerHandle) {
+                    clearTimeout(timeoutCheckerHandle);
+                    timeoutCheckerHandle = null;
                 }
-
-                // Gerador GG Lógica atualizada (Amex 4 dígitos e Dropdowns)
-                function gerarCartoesGG() {
-                    let bin = document.getElementById('genBin').value.trim();
-                    let mesSelect = document.getElementById('genMes').value;
-                    let anoSelect = document.getElementById('genAno').value;
-                    let cvvInput = document.getElementById('genCvv').value.trim().toLowerCase();
-                    let qtd = parseInt(document.getElementById('genQtd').value) || 10;
-
-                    if (!bin) {
-                        alert('Digite uma BIN ou cartão base!');
-                        return;
-                    }
-
-                    // Identifica se é AMEX (começa com 3)
-                    const limpaBin = bin.replace(/\D/g, '');
-                    const isAmex = limpaBin.startsWith('3');
-
-                    let resultado = [];
-                    for (let i = 0; i < qtd; i++) {
-                        let cc = '';
-                        for (let char of bin) {
-                            if (char.toLowerCase() === 'x' || char === '*') {
-                                cc += Math.floor(Math.random() * 10);
-                            } else {
-                                cc += char;
-                            }
-                        }
-                        // Completa o cartão de acordo com o padrão (15 para Amex, 16 para os demais)
-                        let tamanhoAlvo = isAmex ? 15 : 16;
-                        while (cc.length < tamanhoAlvo) {
-                            cc += Math.floor(Math.random() * 10);
-                        }
-
-                        let mes = (mesSelect && mesSelect !== 'rnd') ? mesSelect : String(Math.floor(Math.random() * 12) + 1).padStart(2, '0');
-                        let ano = (anoSelect && anoSelect !== 'rnd') ? anoSelect : String(Math.floor(Math.random() * 6) + 26);
-                        
-                        let cvv = '';
-                        if (cvvInput && cvvInput !== 'rnd') {
-                            cvv = cvvInput;
-                        } else {
-                            if (isAmex) {
-                                // Amex usa 4 dígitos no CVV (CID)
-                                cvv = String(Math.floor(Math.random() * 9000) + 1000);
-                            } else {
-                                // Demais usam 3 dígitos
-                                cvv = String(Math.floor(Math.random() * 900) + 100);
-                            }
-                        }
-
-                        resultado.push(`${cc}|${mes}|${ano}|${cvv}`);
-                    }
-
-                    document.getElementById('resultadoGerador').value = resultado.join('\n');
-                }
-
-                function copiarGG() {
-                    const textarea = document.getElementById('resultadoGerador');
-                    if (!textarea.value) {
-                        alert('Nenhum cartão gerado para copiar!');
-                        return;
-                    }
-                    textarea.select();
-                    navigator.clipboard.writeText(textarea.value);
-                    alert('Cartões copiados para a área de transferência!');
-                }
-
-                function enviarParaChecker() {
-                    const gerado = document.getElementById('resultadoGerador').value;
-                    if (!gerado) {
-                        alert('Gere alguns cartões primeiro!');
-                        return;
-                    }
-                    document.getElementById('listaCartoes').value = gerado;
-                    mudarAba('checker');
-                }
-            </script>
-        </div>
+                document.getElementById('btnIniciar').disabled = false;
+                document.getElementById('btnIniciar').className = "flex-1 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest shadow-lg";
+                document.getElementById('btnParar').disabled = true;
+                document.getElementById('btnParar').className = "bg-zinc-800 text-zinc-500 font-bold py-3 px-4 rounded-xl transition text-xs uppercase tracking-widest cursor-not-allowed";
+            }
+        </script>
     <?php endif; ?>
-
 </body>
 </html>
