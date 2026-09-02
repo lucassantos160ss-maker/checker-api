@@ -264,6 +264,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     <title>CHK DO PECINHA</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Biblioteca QRCode.js para gerar o QR code direto no navegador -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         @keyframes glow {
             0%, 100% { box-shadow: 0 0 20px rgba(168, 85, 247, 0.05); }
@@ -383,8 +385,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                         <h2 class="text-lg font-bold text-white mb-1">Escaneie o QR Code</h2>
                         <p class="text-xs text-purple-400 mb-4">O sistema identificará o pagamento automaticamente</p>
                         
-                        <div class="bg-white p-3 rounded-xl inline-block mb-4 shadow-md">
-                            <img id="imgQrCode" src="" alt="QR Code Pix" class="w-48 h-48 object-contain mx-auto">
+                        <!-- Elemento onde o QR Code será gerado via JavaScript -->
+                        <div class="bg-white p-3 rounded-xl inline-block mb-4 shadow-md flex justify-center items-center">
+                            <div id="qrcodeContainer"></div>
                         </div>
 
                         <div class="mb-4">
@@ -459,7 +462,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                         if (data.status === 'success') {
                             paymentIdGlobal = data.payment_id;
                             document.getElementById('inputCopiaCola').value = data.copia_cola;
-                            document.getElementById('imgQrCode').src = data.qrcode;
+
+                            // Limpa qualquer QR code anterior e gera o novo com a biblioteca qrcode.js
+                            const qrContainer = document.getElementById('qrcodeContainer');
+                            qrContainer.innerHTML = '';
+                            new QRCode(qrContainer, {
+                                text: data.copia_cola,
+                                width: 180,
+                                height: 180,
+                                colorDark: "#000000",
+                                colorLight: "#ffffff",
+                                correctLevel: QRCode.CorrectLevel.M
+                            });
 
                             document.getElementById('etapaForm').classList.add('hidden');
                             document.getElementById('etapaPix').classList.remove('hidden');
