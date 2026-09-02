@@ -113,7 +113,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
         ]
     ];
 
-    $ch = curl_init($PIX_API_URL);
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $PIX_API_URL);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
@@ -121,12 +122,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
     curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0');
-    // ADICIONADO O CABEÇALHO DE AUTORIZAÇÃO OBRIGATÓRIO AQUI:
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    
+    // CABEÇALHOS FORÇADOS COM ARRAY NUMÉRICO ESTrito
+    $headers = array(
         'Content-Type: application/json',
-        'Authorization: Bearer ' . $MP_ACCESS_TOKEN,
+        'Authorization: Bearer ' . trim($MP_ACCESS_TOKEN),
         'X-Idempotency-Key: ' . uniqid('mp_', true)
-    ]);
+    );
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
     $response = curl_exec($ch);
     $curl_error = curl_error($ch);
@@ -201,14 +204,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
 
     $url_check = 'https://api.mercadopago.com/v1/payments/' . $payment_id;
 
-    $ch = curl_init($url_check);
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url_check);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0');
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer ' . $MP_ACCESS_TOKEN
-    ]);
+    
+    $headers_check = array(
+        'Authorization: Bearer ' . trim($MP_ACCESS_TOKEN)
+    );
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers_check);
 
     $response = curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
