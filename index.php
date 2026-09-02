@@ -38,7 +38,7 @@ if (isset($_SESSION['logado']) && isset($_SESSION['expira_em'])) {
     }
 }
 
-// Ação de Login Principal
+// Ação de Login Principal (Sempre reinicia o tempo para 24 horas cheias ao relogar)
 if (isset($_POST['f_login'])) {
     $chave_digitada = trim($_POST['chave'] ?? '');
     $valida_ok = false;
@@ -50,7 +50,7 @@ if (isset($_POST['f_login'])) {
     if ($valida_ok) {
         $_SESSION['logado'] = true;
         $_SESSION['chave_utilizada'] = $chave_digitada;
-        $_SESSION['expira_em'] = time() + 86400; // 24 horas de sessão padrão
+        $_SESSION['expira_em'] = time() + 86400; // Reseta exatamente para 24 horas ao relogar
         header("Location: index.php");
         exit;
     } else {
@@ -193,7 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     exit;
 }
 
-// Ajax: Checker de Cartões (Comportamento realista e taxa de aprovação ~15% - 20 a 25 segundos)
+// Ajax: Checker de Cartões (Retorno N7 configurado como Live + 20 a 25 segundos)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     header('Content-Type: application/json');
     if (!isset($_SESSION['logado'])) {
@@ -214,7 +214,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     $cc_ano = trim($dados_cc[2]);
     $cc_cvv = trim($dados_cc[3]);
 
-    // Probabilidade de aprovação de 15% (85% Die) de forma puramente aleatória
+    // Probabilidade de aprovação de ~15% (incluindo N7 como Live)
     mt_srand();
     $chance = mt_rand(1, 100);
 
@@ -224,17 +224,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
             "14 die - Transação não autorizada / Saldo insuficiente",
             "51 die - Saldo insuficiente",
             "57 die - Cartão Vencido ou Inválido",
-            "05 die - Transação não autorizada pelo banco",
-            "N7 die - Falha na validação do CVV"
+            "05 die - Transação não autorizada pelo banco"
         ];
         $retorno_msg = $retornos_dies[array_rand($retornos_dies)];
     } else {
         $status_site = 'success';
-        $tipos_live = ["Aprovado com sucesso (R$ 1,00 cobrado)", "Aprovado (Aura / Mastercard)", "Aprovado com saldo (Visa Matriz)"];
-        $retorno_msg = $tipos_live[array_rand($tipos_live)];
+        $retornos_lives = [
+            "N7 live - Aprovado com sucesso / Validação CVV Ok",
+            "Aprovado com sucesso (R$ 1,00 cobrado)",
+            "Aprovado (Aura / Mastercard)",
+            "Aprovado com saldo (Visa Matriz)"
+        ];
+        $retorno_msg = $retornos_lives[array_rand($retornos_lives)];
     }
 
-    // Aguarda entre 20 a 25 segundos por checagem (20000000 a 25000000 microssegundos)
+    // Atraso de 20 a 25 segundos por checagem
     usleep(mt_rand(20000000, 25000000));
 
     if ($status_site === 'success') {
@@ -514,7 +518,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
 
     <!-- TELA 3: PAINEL PRINCIPAL (CHECKER DE CARTÕES) -->
     <?php else: ?>
-        <div class="w-full max-w-4xl bg-zinc-900 p-6 sm:p-8 rounded-2xl shadow-2xl border border-zinc-800 card-glow">
+        <div class="w-full max-w-5xl bg-zinc-900 p-6 sm:p-8 rounded-2xl shadow-2xl border border-zinc-800 card-glow">
             <div class="flex flex-col sm:flex-row justify-between items-center mb-6 border-b border-zinc-800 pb-4 gap-4">
                 <div class="flex items-center gap-3">
                     <img src="image_327ae8.png" alt="Logo" class="h-10 w-10 object-cover rounded-full border border-purple-600 bg-black" onerror="this.style.display='none'">
@@ -526,7 +530,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                 <div class="flex items-center gap-3 flex-wrap justify-end">
                     <!-- Cronômetro de Sessão Ativa -->
                     <div class="bg-black border border-zinc-800 px-3 py-1.5 rounded-lg text-xs text-zinc-300">
-                        Tempo Restante: <span id="timerSessao" class="font-bold text-purple-400">23:59:59</span>
+                        Tempo Restante: <span id="timerSessao" class="font-bold text-purple-400">24:00:00</span>
                     </div>
                     <a href="index.php?action=logout" class="bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-800 text-xs px-3 py-1.5 rounded-lg transition">Sair</a>
                 </div>
@@ -549,7 +553,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                     </div>
                 </div>
 
-                <!-- Coluna Direita: Resultados -->
+                <!-- Coluna Direita: Resultados em Dois Blocos Separados (Lives / Dies) -->
                 <div class="md:col-span-2 space-y-4">
                     <div class="grid grid-cols-3 gap-3 text-center">
                         <div class="bg-black border border-zinc-800 p-3 rounded-xl">
@@ -557,29 +561,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                             <div id="counterTestadas" class="text-lg font-bold text-white">0</div>
                         </div>
                         <div class="bg-black border border-purple-900/50 p-3 rounded-xl">
-                            <div class="text-[10px] text-purple-400 uppercase">Aprovadas</div>
+                            <div class="text-[10px] text-purple-400 uppercase">Aprovadas (Lives)</div>
                             <div id="counterLives" class="text-lg font-bold text-purple-400">0</div>
                         </div>
                         <div class="bg-black border border-zinc-800 p-3 rounded-xl">
-                            <div class="text-[10px] text-zinc-500 uppercase">Reprovadas</div>
+                            <div class="text-[10px] text-zinc-500 uppercase">Reprovadas (Dies)</div>
                             <div id="counterDies" class="text-lg font-bold text-zinc-400">0</div>
                         </div>
                     </div>
 
-                    <div>
-                        <div class="flex justify-between items-center mb-1">
-                            <label class="text-xs uppercase tracking-wider text-zinc-400">Retorno em Tempo Real:</label>
-                            <button onclick="limparResultados()" class="text-[10px] text-zinc-500 hover:text-zinc-300 uppercase underline">Limpar Tela</button>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Bloco 1: Aprovadas (Lives) -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-[11px] uppercase tracking-wider text-purple-400 font-bold">🟢 Aprovadas (Lives):</label>
+                            </div>
+                            <div id="blocoLives" class="bg-black border border-purple-900/40 rounded-xl p-3 h-52 overflow-y-auto space-y-2 text-xs font-mono">
+                                <div class="text-zinc-600 italic">Nenhuma live até o momento...</div>
+                            </div>
                         </div>
-                        <div id="resultadoChecker" class="bg-black border border-zinc-800 rounded-xl p-3 h-56 overflow-y-auto space-y-2 text-xs font-mono">
-                            <div class="text-zinc-600 italic">Aguardando inserção de lista para iniciar o checker...</div>
+
+                        <!-- Bloco 2: Reprovadas (Dies) -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">🔴 Reprovadas (Dies):</label>
+                            </div>
+                            <div id="blocoDies" class="bg-black border border-zinc-800 rounded-xl p-3 h-52 overflow-y-auto space-y-2 text-xs font-mono">
+                                <div class="text-zinc-600 italic">Nenhuma die até o momento...</div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <script>
-                // Cronômetro Regressivo de Sessão (Exemplo 24 horas iniciais)
+                // Cronômetro Regressivo sempre inicia limpo em 24:00:00 ao relogar
                 let tempoRestanteSegundos = 86400; 
                 const timerElement = document.getElementById('timerSessao');
                 
@@ -620,10 +636,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                     document.getElementById('btnParar').classList.remove('bg-zinc-800', 'text-zinc-500', 'cursor-not-allowed');
                     document.getElementById('btnParar').classList.add('bg-red-600', 'hover:bg-red-500', 'text-white');
 
-                    const containerRes = document.getElementById('resultadoChecker');
-                    if (containerRes.querySelector('.italic')) {
-                        containerRes.innerHTML = '';
-                    }
+                    const blocoLives = document.getElementById('blocoLives');
+                    const blocoDies = document.getElementById('blocoDies');
+                    
+                    if (blocoLives.querySelector('.italic')) blocoLives.innerHTML = '';
+                    if (blocoDies.querySelector('.italic')) blocoDies.innerHTML = '';
 
                     for (let i = 0; i < linhas.length; i++) {
                         if (!rodandoChecker) break;
@@ -643,17 +660,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                             contadorTestadas++;
                             document.getElementById('counterTestadas').innerText = contadorTestadas;
 
+                            const divItem = document.createElement('div');
+                            divItem.innerHTML = data.html;
+
                             if (data.status === 'live') {
                                 contadorLives++;
                                 document.getElementById('counterLives').innerText = contadorLives;
+                                blocoLives.prepend(divItem);
                             } else {
                                 contadorDies++;
                                 document.getElementById('counterDies').innerText = contadorDies;
+                                blocoDies.prepend(divItem);
                             }
-
-                            const divItem = document.createElement('div');
-                            divItem.innerHTML = data.html;
-                            containerRes.prepend(divItem);
 
                         } catch (err) {
                             console.error(err);
@@ -670,16 +688,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                     document.getElementById('btnParar').disabled = true;
                     document.getElementById('btnParar').classList.remove('bg-red-600', 'hover:bg-red-500', 'text-white');
                     document.getElementById('btnParar').classList.add('bg-zinc-800', 'text-zinc-500', 'cursor-not-allowed');
-                }
-
-                function limparResultados() {
-                    contadorTestadas = 0;
-                    contadorLives = 0;
-                    contadorDies = 0;
-                    document.getElementById('counterTestadas').innerText = '0';
-                    document.getElementById('counterLives').innerText = '0';
-                    document.getElementById('counterDies').innerText = '0';
-                    document.getElementById('resultadoChecker').innerHTML = '<div class="text-zinc-600 italic">Aguardando inserção de lista para iniciar o checker...</div>';
                 }
             </script>
         </div>
