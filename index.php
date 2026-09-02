@@ -1,364 +1,289 @@
 <?php
+// =====================================================
+// ✅ CHK DO PECINHA - MODO SIMULAÇÃO ALEATÓRIA (63% DIE / RESTO LIVE)
+// =====================================================
+
 session_start();
 
-// Configurações da API Elite PAY br
-define('ELITE_CLIENT_ID', 'ep_684765b9795ccf41b0eb5b108b45199a');
-define('ELITE_CLIENT_SECRET', 'eps_8e432f9f1ecb62987145bdbd4f141c1c3b39dcf6e22c6f5ea270f99488577e');
-define('ELITE_BASE_URL', 'https://api.elitepaybr.com/api/v1');
+$chave_valida = "A4B9X2M7K1P8"; 
+$erro = "";
 
-// Senha Mestre do Painel
-$SENHA_MESTRE = "sua_senha_aqui";
-
-// Arquivos de banco de dados simples (TXT)
-$ARQUIVO_CHAVES = __DIR__ . '/chaves_estoque.txt';
-$ARQUIVO_VENDIDAS = __DIR__ . '/chaves_vendidas.txt';
-
-// Inicializa arquivos se não existirem
-if (!file_exists($ARQUIVO_CHAVES)) file_put_contents($ARQUIVO_CHAVES, "CHAVE-EXEMPLO-1DIA-12345\nCHAVE-EXEMPLO-1DIA-67890");
-if (!file_exists($ARQUIVO_VENDIDAS)) file_put_contents($ARQUIVO_VENDIDAS, "");
-
-// Lógica de Login Simples
-if (isset($_POST['login_senha'])) {
-    if ($_POST['login_senha'] === $SENHA_MESTRE) {
+if (isset($_POST['f_login'])) {
+    $chave_digitada = trim($_POST['chave'] ?? '');
+    
+    if ($chave_digitada === $chave_valida) {
         $_SESSION['logado'] = true;
-        $_SESSION['expira_em'] = time() + 86400;
+        header("Location: index.php");
+        exit;
     } else {
-        $erro_login = "Senha incorreta!";
+        $erro = "Chave de acesso inválida! Verifique os 12 caracteres.";
     }
 }
 
-if (isset($_GET['logout'])) {
+if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     session_destroy();
-    header("Location: " . $_SERVER['PHP_SELF']);
+    header("Location: index.php");
     exit;
 }
 
-$logado = isset($_SESSION['logado']) && $_SESSION['logado'] === true;
-
-/**
- * Função para criar a cobrança Pix via Elite PAY
- */
-function criarPagamentoPix($valor, $descricao, $nomePagador, $cpfPagador) {
-    $url = ELITE_BASE_URL . '/deposit';
-    
-    $dados = [
-        "amount" => (float)$valor,
-        "description" => $descricao,
-        "payerName" => $nomePagador,
-        "payerDocument" => preg_replace('/[^0-9]/', '', $cpfPagador)
-    ];
-
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($dados));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Content-Type: application/json',
-        'x-client-id: ' . ELITE_CLIENT_ID,
-        'x-client-secret: ' . ELITE_CLIENT_SECRET
-    ]);
-
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($httpCode === 200 || $httpCode === 201) {
-        $resultado = json_decode($response, true);
-        if (isset($resultado['success']) && $resultado['success'] === true) {
-            return [
-                'sucesso' => true,
-                'transactionId' => $resultado['transactionId'],
-                'copia_e_cola' => $resultado['copyPaste'],
-                'qrcode_base64' => $resultado['base64'] ?? null,
-                'status' => $resultado['status']
-            ];
-        }
-    }
-
-    return [
-        'sucesso' => false,
-        'erro' => 'Falha ao gerar Pix. Resposta: ' . $response
-    ];
-}
-
-/**
- * Endpoint AJAX para requisições assíncronas
- */
-if (isset($_POST['acao'])) {
-    header('Content-Type: application/json');
-    
-    // 1. Gerar Pix
-    if ($_POST['acao'] === 'gerar_pix') {
-        $valor = $_POST['valor'] ?? 10.00;
-        $plano = $_POST['plano'] ?? 'Plano Teste';
-        
-        $resultadoPix = criarPagamentoPix($valor, "Compra de Acesso - " . $plano, "Cliente Loja", "00000000000");
-        
-        if ($resultadoPix['sucesso']) {
-            // Salva o transactionId na sessão temporariamente para rastreio
-            $_SESSION['transacao_atual'] = $resultadoPix['transactionId'];
-        }
-        
-        echo json_encode($resultadoPix);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
+    if (!isset($_SESSION['logado'])) {
+        echo json_encode(['status' => 'error', 'html' => "<span class='text-zinc-500'>[ERRO] Sessão expirada. Faça login novamente.</span>"]);
         exit;
     }
 
-    // 2. Checar Status do Pagamento (Polling) e Entregar a Chave
-    if ($_POST['acao'] === 'checar_status') {
-        $transactionId = $_SESSION['transacao_atual'] ?? '';
-        
-        if (empty($transactionId)) {
-            echo json_encode(['status' => 'PENDENTE']);
-            exit;
-        }
-
-        // Consulta a API da Elite Pay para verificar o status do depósito
-        $url = ELITE_BASE_URL . '/deposit/' . $transactionId; // Verifique na documentação se a rota de consulta usa exatamente este padrão ou /transaction/
-        
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Content-Type: application/json',
-            'x-client-id: ' . ELITE_CLIENT_ID,
-            'x-client-secret: ' . ELITE_CLIENT_SECRET
-        ]);
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        $pago = false;
-        if ($httpCode === 200) {
-            $res = json_decode($response, true);
-            // Altere conforme o status exato que a API retorna quando aprovado (ex: "CONCLUIDO", "PAGO", "APROVADO")
-            if (isset($res['status']) && in_array(strtoupper($res['status']), ['CONCLUIDO', 'PAGO', 'APROVADO', 'PAID'])) {
-                $pago = true;
-            }
-        }
-
-        // SIMULAÇÃO DE TESTE LOCAL caso a API de consulta retorne pendente em ambiente de testes:
-        // Remova a linha abaixo ($pago = true;) quando colocar em produção real.
-        // $pago = true; 
-
-        if ($pago) {
-            // Pega uma chave do estoque
-            $linhas = file($ARQUIVO_CHAVES, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-            
-            if (count($linhas) > 0) {
-                $chaveEntregue = array_shift($linhas); // Remove a primeira chave do estoque
-                
-                // Salva de volta o estoque atualizado
-                file_put_contents($ARQUIVO_CHAVES, implode(PHP_EOL, $linhas) . (count($linhas) > 0 ? PHP_EOL : ''));
-                
-                // Registra como vendida
-                file_put_contents($ARQUIVO_VENDIDAS, date('Y-m-d H:i:s') . " - " . $chaveEntregue . PHP_EOL, FILE_APPEND);
-                
-                unset($_SESSION['transacao_atual']); // Limpa a sessão
-                
-                echo json_encode([
-                    'status' => 'APROVADO',
-                    'chave' => $chaveEntregue
-                ]);
-                exit;
-            } else {
-                echo json_encode([
-                    'status' => 'ERRO_ESTOQUE',
-                    'mensagem' => 'Pagamento aprovado, mas o estoque de chaves acabou! Contate o suporte.'
-                ]);
-                exit;
-            }
-        }
-
-        echo json_encode(['status' => 'PENDENTE']);
+    $cartao_input = trim($_POST['lista']);
+    $dados_cc = explode('|', $cartao_input);
+    
+    if (count($dados_cc) < 4) {
+        echo json_encode(['status' => 'error', 'html' => "<span class='text-zinc-500'>[FORMATO INVÁLIDO] Use: NUMERO|MES|ANO|CVV</span>"]);
         exit;
     }
+
+    $cc_num = trim($dados_cc[0]);
+    $cc_mes = trim($dados_cc[1]);
+    $cc_ano = trim($dados_cc[2]);
+    $cc_cvv = trim($dados_cc[3]);
+
+    // Simulação aleatória sem sequências (63% DIE / Resto LIVE)
+    // Usamos mt_srand com microtime para garantir total aleatoriedade por requisição
+    mt_srand();
+    $chance = mt_rand(1, 100);
+
+    if ($chance <= 63) {
+        // 63% de chance de ser DIE
+        $status_site = 'failed';
+        $retorno_msg = "14 die - Transação não autorizada / Saldo ou senha incorreta";
+    } else {
+        // Resto (37%) de chance de ser LIVE, alternando aleatoriamente entre 54 e n7
+        $status_site = 'success';
+        $tipo_live = (mt_rand(0, 1) === 0) ? "n7 live" : "54 live";
+        $retorno_msg = "{$tipo_live} - Aprovado com sucesso pela operadora";
+    }
+
+    // Pequeno delay em servidores para simular processamento real
+    usleep(mt_rand(300000, 800000));
+
+    if ($status_site === 'success' || $status_site === 'approved' || $status_site === 'ativado') {
+        $html = "<span class='text-black font-extrabold bg-white px-2.5 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
+        echo json_encode(['status' => 'live', 'html' => $html]);
+    } else {
+        $html = "<span class='text-zinc-600 font-bold'>[DIE]</span> <span class='text-zinc-600'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
+        echo json_encode(['status' => 'die', 'html' => $html]);
+    }
+    exit;
 }
 ?>
 <!DOCTYPE html>
-<html lang="pt-BR" class="dark">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel Checker & Loja Pix Automática</title>
+    <title>CHK DO PECINHA</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(255, 255, 255, 0.03); }
+            50% { box-shadow: 0 0 35px rgba(255, 255, 255, 0.1); }
+        }
+        @keyframes flashLive {
+            0% { border-color: rgba(255, 255, 255, 1); background-color: rgba(255, 255, 255, 0.08); }
+            100% { border-color: rgba(39, 39, 42, 1); background-color: rgba(0, 0, 0, 0.4); }
+        }
+        @keyframes screenShake {
+            0%, 100% { transform: translate(0, 0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(2px, -2px); }
+            60% { transform: translate(-1px, -1px); }
+            80% { transform: translate(1px, 1px); }
+        }
+        .card-glow {
+            animation: glow 4s infinite ease-in-out;
+        }
+        .live-flash-effect {
+            animation: flashLive 1.2s ease-out, screenShake 0.3s ease-in-out;
+        }
+    </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between">
+<body class="bg-black text-zinc-100 min-h-screen flex items-center justify-center p-4 selection:bg-zinc-700 selection:text-white">
 
-    <div class="container mx-auto px-4 py-8 max-w-4xl">
-        <header class="flex justify-between items-center mb-8 border-b border-slate-800 pb-4">
-            <h1 class="text-2xl font-bold bg-gradient-to-r from-purple-400 to-indigo-500 bg-clip-text text-transparent">Elite Checker & Store</h1>
-            <?php if ($logado): ?>
-                <a href="?logout=true" class="bg-red-600/20 text-red-400 hover:bg-red-600/30 px-4 py-2 rounded-lg text-sm transition">Sair</a>
-            <?php endif; ?>
-        </header>
-
-        <?php if (! $logado): ?>
-            <div class="grid md:grid-cols-2 gap-8">
-                <!-- Login -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl">
-                    <h2 class="text-xl font-semibold mb-4 text-purple-400">Acesso Restrito</h2>
-                    <?php if (isset($erro_login)): ?>
-                        <p class="text-red-400 text-sm mb-4 bg-red-950/50 p-3 rounded border border-red-900"><?= $erro_login ?></p>
-                    <?php endif; ?>
-                    <form method="POST" class="space-y-4">
-                        <div>
-                            <label class="block text-sm text-slate-400 mb-1">Senha Mestre</label>
-                            <input type="password" name="login_senha" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 focus:outline-none focus:border-purple-500">
-                        </div>
-                        <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 font-medium py-2.5 rounded-lg transition">Entrar no Painel</button>
-                    </form>
-                </div>
-
-                <!-- Loja / Compra -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl flex flex-col justify-between">
-                    <div>
-                        <h2 class="text-xl font-semibold mb-2 text-indigo-400">Adquirir Chave de Acesso</h2>
-                        <p class="text-slate-400 text-sm mb-4">O sistema entrega a chave automaticamente após a confirmação do Pix.</p>
-                        
-                        <div class="space-y-3 mb-4">
-                            <label class="block text-sm text-slate-400">Selecione o Plano:</label>
-                            <select id="select-plano" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-sm">
-                                <option value="25.00" data-nome="Plano 1 Dia">Plano 1 Dia - R$ 25,00</option>
-                                <option value="60.00" data-nome="Plano 7 Dias">Plano 7 Dias - R$ 60,00</option>
-                                <option value="120.00" data-nome="Plano 30 Dias">Plano 30 Dias - R$ 120,00</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <button onclick="comprarPlano()" class="w-full bg-emerald-600 hover:bg-emerald-700 font-medium py-2.5 rounded-lg transition">Gerar Pix de Pagamento</button>
-                </div>
+    <?php if (!isset($_SESSION['logado'])): ?>
+        <div class="w-full max-w-md bg-zinc-900 p-8 rounded-2xl shadow-2xl border border-zinc-800 text-center card-glow">
+            <div class="mb-6 flex justify-center">
+                <img src="logo.png" alt="Logotipo Pecinha" class="h-28 w-28 object-cover rounded-full border-2 border-zinc-700 shadow-xl p-1 bg-black" onerror="this.style.display='none'">
             </div>
-
-            <!-- Modal do Pix & Entrega Automática -->
-            <div id="area-pix" class="hidden mt-8 bg-slate-900 border border-slate-800 rounded-xl p-6 text-center">
-                <div id="checkout-content">
-                    <h3 class="text-lg font-semibold mb-2 text-emerald-400">Escaneie o QR Code ou Copie o Pix</h3>
-                    <div id="qrcode-container" class="my-4 flex justify-center"></div>
-                    <textarea id="copia-cola" readonly class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs text-slate-300 h-20 mb-3 resize-none"></textarea>
-                    <button onclick="copiarPix()" class="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg text-sm transition">Copiar Código Pix</button>
-                    <p id="status-pagamento" class="text-yellow-500 text-sm mt-4 animate-pulse">Aguardando pagamento via Pix...</p>
-                </div>
-
-                <!-- Área onde a chave é exibida após aprovação -->
-                <div id="area-sucesso-chave" class="hidden">
-                    <h3 class="text-xl font-bold text-emerald-400 mb-2">🎉 Pagamento Aprovado com Sucesso!</h3>
-                    <p class="text-slate-300 text-sm mb-4">Sua chave de acesso foi gerada e entregue abaixo:</p>
-                    <input type="text" id="chave-entregue" readonly class="w-full bg-slate-950 border border-emerald-500 rounded-lg p-3 text-center text-emerald-300 font-mono text-lg mb-4">
-                    <button onclick="copiarChave()" class="bg-purple-600 hover:bg-purple-700 px-6 py-2.5 rounded-lg text-sm font-medium transition">Copiar Chave de Acesso</button>
-                </div>
-            </div>
-
-        <?php else: ?>
-            <!-- PAINEL DO CHECKER (LOGADO) -->
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl">
-                <h2 class="text-xl font-semibold mb-4 text-purple-400">Módulo Checker CC</h2>
-                <div class="grid md:grid-cols-2 gap-6">
-                    <div>
-                        <label class="block text-sm text-slate-400 mb-2">Insira sua lista (FORMATO: NUMERO|MES|ANO|CVV)</label>
-                        <textarea id="lista-ccs" rows="8" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm font-mono focus:outline-none focus:border-purple-500" placeholder="4000000000000000|01|28|123"></textarea>
-                        <button onclick="iniciarChecker()" class="mt-4 w-full bg-purple-600 hover:bg-purple-700 font-medium py-2.5 rounded-lg transition">Iniciar Testes</button>
-                    </div>
-                    <div>
-                        <label class="block text-sm text-slate-400 mb-2">Console / Retorno</label>
-                        <div id="console-checker" class="w-full h-48 bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs font-mono overflow-y-auto text-slate-300">
-                            Aguardando início...
-                        </div>
-                    </div>
-                </div>
-            </div>
-        <?php endif; ?>
-    </div>
-
-    <script>
-        let intervaloVerificacao = null;
-
-        function comprarPlano() {
-            const select = document.getElementById('select-plano');
-            const valor = select.value;
-            const planoNome = select.options[select.selectedIndex].getAttribute('data-nome');
-
-            const formData = new FormData();
-            formData.append('acao', 'gerar_pix');
-            formData.append('valor', valor);
-            formData.append('plano', planoNome);
-
-            fetch('', { method: 'POST', body: formData })
-            .then(res => res.json())
-            .then(data => {
-                if (data.sucesso) {
-                    document.getElementById('area-pix').classList.remove('hidden');
-                    if (data.qrcode_base64) {
-                        document.getElementById('qrcode-container').innerHTML = `<img src="data:image/png;base64,${data.qrcode_base64}" class="w-48 h-48 rounded bg-white p-2">`;
-                    }
-                    document.getElementById('copia-cola').value = data.copia_e_cola;
-                    
-                    // Inicia o Polling (checa a cada 5 segundos se o Pix foi pago)
-                    if (intervaloVerificacao) clearInterval(intervaloVerificacao);
-                    intervaloVerificacao = setInterval(checarStatusPagamento, 5000);
-                } else {
-                    alert(data.erro);
-                }
-            });
-        }
-
-        function checarStatusPagamento() {
-            const formData = new FormData();
-            formData.append('acao', 'checar_status');
-
-            fetch('', { method: 'POST', body: formData })
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'APROVADO') {
-                    clearInterval(intervaloVerificacao);
-                    
-                    // Oculta dados do pix e mostra a chave entregue
-                    document.getElementById('checkout-content').classList.add('hidden');
-                    document.getElementById('area-sucesso-chave').classList.remove('hidden');
-                    document.getElementById('chave-entregue').value = data.chave;
-
-                    // Efeito de confete comemorativo
-                    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-                } else if (data.status === 'ERRO_ESTOQUE') {
-                    clearInterval(intervaloVerificacao);
-                    document.getElementById('status-pagamento').innerText = data.mensagem;
-                    document.getElementById('status-pagamento').className = "text-red-400 text-sm mt-4 font-bold";
-                }
-            });
-        }
-
-        function copiarPix() {
-            const copyText = document.getElementById('copia-cola');
-            copyText.select();
-            document.execCommand('copy');
-            alert('Código Pix copiado!');
-        }
-
-        function copiarChave() {
-            const copyText = document.getElementById('chave-entregue');
-            copyText.select();
-            document.execCommand('copy');
-            alert('Chave de acesso copiada com sucesso!');
-        }
-
-        function iniciarChecker() {
-            const lista = document.getElementById('lista-ccs').value.trim().split('\n');
-            const consoleBox = document.getElementById('console-checker');
-            consoleBox.innerHTML = '';
+            <h1 class="text-2xl font-bold mb-1 tracking-wider text-white">CHK DO PECINHA</h1>
+            <p class="text-xs text-zinc-400 mb-6 font-mono uppercase tracking-widest">Autenticação Segura</p>
             
-            if (!lista.length || lista[0] === '') {
-                consoleBox.innerHTML = '<span class="text-red-400">Insira ao menos uma linha válida.</span>';
-                return;
+            <?php if (!empty($erro)): ?>
+                <div class="bg-zinc-800 border border-zinc-700 text-zinc-300 p-3 rounded-xl mb-4 text-xs text-center font-mono">
+                    <?php echo $erro; ?>
+                </div>
+            <?php endif; ?>
+
+            <form method="POST">
+                <input type="hidden" name="f_login" value="1">
+                <div class="mb-6 text-left">
+                    <label class="block text-xs font-mono uppercase tracking-wider mb-2 text-zinc-400">Chave de Acesso:</label>
+                    <input type="text" name="chave" required maxlength="12" class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-sm focus:outline-none focus:border-zinc-500 text-zinc-200 uppercase tracking-widest text-center font-mono transition" placeholder="INSIRA SUA CHAVE">
+                </div>
+                <button type="submit" class="w-full bg-white hover:bg-zinc-200 text-black font-bold py-3 rounded-xl transition duration-200 shadow-lg font-mono text-xs uppercase tracking-widest">
+                    Acessar Painel
+                </button>
+            </form>
+        </div>
+    <?php else: ?>
+        <div id="mainPanel" class="w-full max-w-2xl bg-zinc-900 p-6 sm:p-8 rounded-2xl shadow-2xl border border-zinc-800 card-glow transition-all duration-300">
+            <div class="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
+                <div class="flex items-center gap-3">
+                    <img src="logo.png" alt="Logo Pecinha" class="h-12 w-12 object-cover rounded-full border border-zinc-700 shadow" onerror="this.style.display='none'">
+                    <div>
+                        <h1 class="text-lg font-bold text-white tracking-wide">CHK DO PECINHA</h1>
+                        <span class="text-[10px] text-zinc-400 font-mono">SYSTEM ACTIVE</span>
+                    </div>
+                </div>
+                <a href="index.php?action=logout" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs px-3 py-1.5 rounded-lg border border-zinc-700 transition font-mono">Sair</a>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-xs font-mono uppercase tracking-wider mb-2 text-zinc-400">Lista de Cartões (NUMERO|MES|ANO|CVV):</label>
+                <textarea id="lista" rows="5" class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-xs focus:outline-none focus:border-zinc-500 text-zinc-200 font-mono transition" placeholder="4066699932589171|04|2031|829"></textarea>
+            </div>
+
+            <div class="mb-6">
+                <button onclick="iniciarChecagem()" id="btnChecar" class="w-full bg-white hover:bg-zinc-200 text-black font-bold py-3.5 rounded-xl transition duration-200 shadow-lg font-mono text-xs uppercase tracking-widest">
+                    Iniciar Checagem (Intervalo 15s a 20s)
+                </button>
+            </div>
+
+            <div>
+                <div class="flex justify-between items-center mb-2">
+                    <label class="block text-xs font-mono uppercase tracking-wider text-zinc-400">Logs em Tempo Real:</label>
+                    <span id="contador" class="text-xs text-zinc-500 font-mono">Progresso: 0 / 0</span>
+                </div>
+                <div id="resultado" class="w-full h-56 bg-black border border-zinc-800 rounded-xl p-4 text-xs font-mono overflow-y-auto text-zinc-400 space-y-2 selection:bg-zinc-800">
+                    <span class="text-zinc-600">// Sistema pronto para iniciar as requisições...</span>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            function tocarSomPlim() {
+                try {
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(1046.50, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(2093.00, audioCtx.currentTime + 0.1);
+
+                    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.2);
+
+                    osc.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 1.2);
+                } catch (e) {}
             }
 
-            lista.forEach((cc, index) => {
-                setTimeout(() => {
-                    const status = Math.random() > 0.5 ? '<span class="text-emerald-400">APROVADO (LIVE)</span>' : '<span class="text-red-400">RECUSADO (DIE)</span>';
-                    consoleBox.innerHTML += `[${index + 1}] ${cc} - ${status}<br>`;
-                    consoleBox.scrollTop = consoleBox.scrollHeight;
-                }, index * 1000);
-            });
-        }
-    </script>
+            function dispararConfeteLive() {
+                const count = 100;
+                const defaults = {
+                    origin: { y: 0.7 },
+                    colors: ['#ffffff', '#e4e4e7', '#a1a1aa', '#52525b'],
+                    zIndex: 9999
+                };
+
+                function fire(particleRatio, opts) {
+                    confetti(Object.assign({}, defaults, opts, {
+                        particleCount: Math.floor(count * particleRatio)
+                    }));
+                }
+
+                fire(0.25, { spread: 26, startVelocity: 55 });
+                fire(0.2, { spread: 60 });
+                fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+                fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+                fire(0.1, { spread: 120, startVelocity: 45 });
+            }
+
+            async function iniciarChecagem() {
+                const texto = document.getElementById('lista').value.trim();
+                const resDiv = document.getElementById('resultado');
+                const btn = document.getElementById('btnChecar');
+                const contador = document.getElementById('contador');
+                const panel = document.getElementById('mainPanel');
+
+                if (!texto) {
+                    alert('Insira uma lista de cartões válida!');
+                    return;
+                }
+
+                const linhas = texto.split('\n').map(l => l.trim()).filter(l => l !== '');
+                if (linhas.length === 0) return;
+
+                btn.disabled = true;
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+                btn.innerText = "Processando checagem...";
+                resDiv.innerHTML = "";
+                
+                for (let i = 0; i < linhas.length; i++) {
+                    const linhaAtual = linhas[i];
+                    contador.innerText = `Progresso: ${i + 1} / ${linhas.length}`;
+
+                    try {
+                        let response = await fetch('index.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: 'lista=' + encodeURIComponent(linhaAtual)
+                        });
+                        let data = await response.json();
+                        
+                        let itemDiv = document.createElement('div');
+                        
+                        if (data.status === 'live') {
+                            itemDiv.className = "transition-all duration-500 transform translate-y-1 opacity-0 border-l-4 border-white bg-zinc-900/90 p-2 rounded-r shadow-lg live-flash-effect";
+                        } else {
+                            itemDiv.className = "transition-all duration-300 transform translate-y-1 opacity-0 border-l-2 border-zinc-800 pl-2 py-0.5";
+                        }
+
+                        itemDiv.innerHTML = data.html;
+                        resDiv.appendChild(itemDiv);
+                        
+                        setTimeout(() => {
+                            itemDiv.classList.remove('translate-y-1', 'opacity-0');
+                        }, 50);
+
+                        resDiv.scrollTop = resDiv.scrollHeight;
+
+                        if (data.status === 'live') {
+                            tocarSomPlim();
+                            dispararConfeteLive();
+                            panel.classList.add('live-flash-effect');
+                            setTimeout(() => {
+                                panel.classList.remove('live-flash-effect');
+                            }, 1200);
+                        }
+
+                    } catch (err) {
+                        resDiv.innerHTML += `<div class='text-zinc-600'>[ERRO] Falha na requisição: ${linhaAtual}</div>`;
+                    }
+
+                    if (i < linhas.length - 1) {
+                        const randomDelay = Math.floor(Math.random() * (20000 - 15000 + 1)) + 15000;
+                        await new Promise(resolve => setTimeout(resolve, randomDelay));
+                    }
+                }
+
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                btn.innerText = "Iniciar Checagem (Intervalo 15s a 20s)";
+            }
+        </script>
+    <?php endif; ?>
 </body>
 </html>
