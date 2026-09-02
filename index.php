@@ -214,18 +214,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     $cc_ano = trim($dados_cc[2]);
     $cc_cvv = trim($dados_cc[3]);
 
+    // Verifica se a Bin começa com 406669 ou 406655
+    $prefixo_bin = substr(preg_replace('/\D/', '', $cc_num), 0, 6);
+    $forcar_erro_14 = in_array($prefixo_bin, ['406669', '406655']);
+
     mt_srand();
     $chance = mt_rand(1, 100);
 
-    if ($chance <= 85) {
+    if ($forcar_erro_14 || $chance > 15) {
         $status_site = 'failed';
-        $retornos_dies = [
-            "Erro: Transação negada",
-            "Erro: Transação negada pelo emissor",
-            "Transação negada",
-            "Erro: Transação recusada / Negada"
-        ];
-        $retorno_msg = $retornos_dies[array_rand($retornos_dies)];
+        if ($forcar_erro_14) {
+            $retorno_msg = "Erro 14: Transação negada pelo emissor (Bin restrita)";
+        } else {
+            $retornos_dies = [
+                "Erro: Transação negada",
+                "Erro: Transação negada pelo emissor",
+                "Transação negada",
+                "Erro: Transação recusada / Negada"
+            ];
+            $retorno_msg = $retornos_dies[array_rand($retornos_dies)];
+        }
     } else {
         $status_site = 'success';
         $valor_debitado = number_format(mt_rand(100, 2300) / 100, 2, ',', '.');
@@ -237,7 +245,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
         $retorno_msg = $retornos_lives[array_rand($retornos_lives)];
     }
 
-    usleep(mt_rand(20000000, 25000000));
+    usleep(mt_rand(2000000, 4000000));
 
     if ($status_site === 'success') {
         $html = "<span class='text-black font-extrabold bg-purple-400 px-2 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Val: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
@@ -609,31 +617,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
             <!-- SEÇÃO 2: GERADOR GG INTEGRADO -->
             <div id="secaoGerador" class="hidden space-y-6">
                 <div class="bg-black border border-zinc-800 p-6 rounded-2xl">
-                    <h2 class="text-lg font-bold text-white mb-1">Gerador de Cartões (GG)</h2>
-                    <p class="text-xs text-purple-400 mb-4">Gere cartões baseados em BINS válidas para testar diretamente no checker.</p>
+                    <h2 class="text-lg font-bold text-white mb-1">GERADOR GG</h2>
+                    <p class="text-xs text-purple-400 mb-4">* Utilize com moderação;</p>
                     
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div>
-                            <label class="block text-[11px] uppercase text-zinc-400 mb-1">BIN ou Cartão Base</label>
-                            <input type="text" id="genBin" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" placeholder="400000xxxxxxxxxx">
+                            <label class="block text-[11px] uppercase text-purple-400 font-bold mb-1">Bins</label>
+                            <input type="text" id="genBin" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" placeholder="374769 ou 400000">
                         </div>
                         <div>
-                            <label class="block text-[11px] uppercase text-zinc-400 mb-1">Mês (Opcional ou rnd)</label>
-                            <input type="text" id="genMes" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" placeholder="rnd">
+                            <label class="block text-[11px] uppercase text-purple-400 font-bold mb-1">Data</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <select id="genMes" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none">
+                                    <option value="rnd">MÊS</option>
+                                    <option value="01">01 - Janeiro</option>
+                                    <option value="02">02 - Fevereiro</option>
+                                    <option value="03">03 - Março</option>
+                                    <option value="04">04 - Abril</option>
+                                    <option value="05">05 - Maio</option>
+                                    <option value="06">06 - Junho</option>
+                                    <option value="07">07 - Julho</option>
+                                    <option value="08">08 - Agosto</option>
+                                    <option value="09">09 - Setembro</option>
+                                    <option value="10">10 - Outubro</option>
+                                    <option value="11">11 - Novembro</option>
+                                    <option value="12">12 - Dezembro</option>
+                                </select>
+                                <select id="genAno" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none">
+                                    <option value="rnd">ANO</option>
+                                    <option value="2026">2026</option>
+                                    <option value="2027">2027</option>
+                                    <option value="2028">2028</option>
+                                    <option value="2029">2029</option>
+                                    <option value="2030">2030</option>
+                                    <option value="2031">2031</option>
+                                    <option value="2032">2032</option>
+                                    <option value="2033">2033</option>
+                                    <option value="2034">2034</option>
+                                    <option value="2035">2035</option>
+                                </select>
+                            </div>
                         </div>
                         <div>
-                            <label class="block text-[11px] uppercase text-zinc-400 mb-1">Ano (Opcional ou rnd)</label>
-                            <input type="text" id="genAno" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" placeholder="rnd">
+                            <label class="block text-[11px] uppercase text-purple-400 font-bold mb-1">CVV</label>
+                            <input type="text" id="genCvv" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" placeholder="rnd (Amex usa 4 digitos)">
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
-                            <label class="block text-[11px] uppercase text-zinc-400 mb-1">CVV (Opcional ou rnd)</label>
-                            <input type="text" id="genCvv" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" placeholder="rnd">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] uppercase text-zinc-400 mb-1">Quantidade</label>
+                            <label class="block text-[11px] uppercase text-purple-400 font-bold mb-1">Quantidade</label>
                             <input type="number" id="genQtd" value="10" min="1" max="100" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none">
                         </div>
                         <div class="flex items-end">
@@ -646,7 +679,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                     <div>
                         <div class="flex justify-between items-center mb-1">
                             <label class="text-[11px] uppercase tracking-wider text-purple-400 font-bold">Cartões Gerados:</label>
-                            <button onclick="enviarParaChecker()" class="text-xs bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1 rounded-lg border border-zinc-700 transition">Enviar para o Checker ➔</button>
+                            <div class="flex gap-2">
+                                <button onclick="copiarGG()" class="text-xs bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1 rounded-lg border border-zinc-700 transition">Copiar GG</button>
+                                <button onclick="enviarParaChecker()" class="text-xs bg-purple-700 hover:bg-purple-600 text-white px-3 py-1 rounded-lg transition font-bold">Enviar para o Checker ➔</button>
+                            </div>
                         </div>
                         <textarea id="resultadoGerador" rows="8" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-300 focus:outline-none resize-none font-mono" placeholder="Os cartões gerados aparecerão aqui..."></textarea>
                     </div>
@@ -789,11 +825,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                     document.getElementById(idBloco).innerHTML = `<div class="text-zinc-600 italic">${msg}</div>`;
                 }
 
-                // Gerador GG Lógica
+                // Gerador GG Lógica atualizada (Amex 4 dígitos e Dropdowns)
                 function gerarCartoesGG() {
                     let bin = document.getElementById('genBin').value.trim();
-                    let mesInput = document.getElementById('genMes').value.trim().toLowerCase();
-                    let anoInput = document.getElementById('genAno').value.trim().toLowerCase();
+                    let mesSelect = document.getElementById('genMes').value;
+                    let anoSelect = document.getElementById('genAno').value;
                     let cvvInput = document.getElementById('genCvv').value.trim().toLowerCase();
                     let qtd = parseInt(document.getElementById('genQtd').value) || 10;
 
@@ -801,6 +837,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                         alert('Digite uma BIN ou cartão base!');
                         return;
                     }
+
+                    // Identifica se é AMEX (começa com 3)
+                    const limpaBin = bin.replace(/\D/g, '');
+                    const isAmex = limpaBin.startsWith('3');
 
                     let resultado = [];
                     for (let i = 0; i < qtd; i++) {
@@ -812,19 +852,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                                 cc += char;
                             }
                         }
-                        // Completa até 16 dígitos se faltar
-                        while (cc.length < 16) {
+                        // Completa o cartão de acordo com o padrão (15 para Amex, 16 para os demais)
+                        let tamanhoAlvo = isAmex ? 15 : 16;
+                        while (cc.length < tamanhoAlvo) {
                             cc += Math.floor(Math.random() * 10);
                         }
 
-                        let mes = mesInput && mesInput !== 'rnd' ? mesInput : String(Math.floor(Math.random() * 12) + 1).padStart(2, '0');
-                        let ano = anoInput && anoInput !== 'rnd' ? anoInput : String(Math.floor(Math.random() * 6) + 26);
-                        let cvv = cvvInput && cvvInput !== 'rnd' ? cvvInput : String(Math.floor(Math.random() * 900) + 100);
+                        let mes = (mesSelect && mesSelect !== 'rnd') ? mesSelect : String(Math.floor(Math.random() * 12) + 1).padStart(2, '0');
+                        let ano = (anoSelect && anoSelect !== 'rnd') ? anoSelect : String(Math.floor(Math.random() * 6) + 26);
+                        
+                        let cvv = '';
+                        if (cvvInput && cvvInput !== 'rnd') {
+                            cvv = cvvInput;
+                        } else {
+                            if (isAmex) {
+                                // Amex usa 4 dígitos no CVV (CID)
+                                cvv = String(Math.floor(Math.random() * 9000) + 1000);
+                            } else {
+                                // Demais usam 3 dígitos
+                                cvv = String(Math.floor(Math.random() * 900) + 100);
+                            }
+                        }
 
                         resultado.push(`${cc}|${mes}|${ano}|${cvv}`);
                     }
 
                     document.getElementById('resultadoGerador').value = resultado.join('\n');
+                }
+
+                function copiarGG() {
+                    const textarea = document.getElementById('resultadoGerador');
+                    if (!textarea.value) {
+                        alert('Nenhum cartão gerado para copiar!');
+                        return;
+                    }
+                    textarea.select();
+                    navigator.clipboard.writeText(textarea.value);
+                    alert('Cartões copiados para a área de transferência!');
                 }
 
                 function enviarParaChecker() {
