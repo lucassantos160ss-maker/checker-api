@@ -291,8 +291,11 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        /* Variáveis de Temas */
+        /* Variáveis de Temas (Tema Prime agora com fundo totalmente escuro/preto fosco e detalhes em Vermelho Sangue / Neon Red) */
         body.theme-padrao {
+            --bg-base: #000000;
+            --panel-bg: #09090b;
+            --input-bg: #000000;
             --primary: #9333ea;
             --primary-hover: #a855f7;
             --primary-light: rgba(168, 85, 247, 0.15);
@@ -300,11 +303,14 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
             --badge-bg: #c084fc;
         }
         body.theme-prime {
-            --primary: #dc2626;
-            --primary-hover: #ef4444;
-            --primary-light: rgba(220, 38, 38, 0.15);
+            --bg-base: #030305;
+            --panel-bg: #09090e;
+            --input-bg: #030305;
+            --primary: #ef4444;
+            --primary-hover: #f87171;
+            --primary-light: rgba(239, 68, 68, 0.15);
             --border-theme: #b91c1c;
-            --badge-bg: #f87171;
+            --badge-bg: #fca5a5;
         }
 
         @keyframes glow-padrao {
@@ -312,8 +318,8 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
             50% { box-shadow: 0 0 35px rgba(168, 85, 247, 0.2); }
         }
         @keyframes glow-prime {
-            0%, 100% { box-shadow: 0 0 20px rgba(220, 38, 38, 0.1); }
-            50% { box-shadow: 0 0 40px rgba(220, 38, 38, 0.35); }
+            0%, 100% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.1); }
+            50% { box-shadow: 0 0 40px rgba(239, 68, 68, 0.35); }
         }
 
         body.theme-padrao .card-glow { animation: glow-padrao 4s infinite ease-in-out; }
@@ -332,6 +338,54 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
         .theme-logo-circle { stroke: var(--primary) !important; }
         .theme-logo-text { fill: var(--badge-bg) !important; }
         .theme-live-badge { background-color: var(--badge-bg) !important; color: #000 !important; }
+
+        /* Estilização do Botão Flutuante (Lua / Sol com Bolinha Deslizante) */
+        .theme-toggle-container {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 50;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-theme);
+            border-radius: 9999px;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            transition: all 0.3s ease;
+        }
+        .theme-toggle-container:hover {
+            border-color: var(--primary-hover);
+        }
+        .theme-toggle-icon {
+            font-size: 14px;
+            padding: 0 4px;
+            user-select: none;
+        }
+        .theme-toggle-switch {
+            width: 36px;
+            height: 20px;
+            background-color: #18181b;
+            border-radius: 9999px;
+            position: relative;
+            transition: background-color 0.3s ease;
+            border: 1px solid #27272a;
+        }
+        .theme-toggle-thumb {
+            width: 14px;
+            height: 14px;
+            background-color: var(--primary);
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
+        }
+        body.theme-prime .theme-toggle-thumb {
+            transform: translateX(16px);
+        }
     </style>
     <script>
         // Carrega o tema salvo imediatamente para evitar flash de estilo incorreto
@@ -340,21 +394,19 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
             document.documentElement.className = savedTheme;
             document.addEventListener('DOMContentLoaded', () => {
                 document.body.className = `bg-black text-zinc-100 min-h-screen flex items-center justify-center p-4 selection:bg-red-600 selection:text-white font-mono ${savedTheme}`;
-                const selectEl = document.getElementById('seletorTema');
-                if (selectEl) selectEl.value = savedTheme;
             });
         })();
     </script>
 </head>
 <body class="bg-black text-zinc-100 min-h-screen flex items-center justify-center p-4 selection:bg-purple-600 selection:text-white font-mono">
 
-    <!-- SELETOR DE TEMA FLUTUANTE (CANTO SUPERIOR DIREITO) -->
-    <div class="fixed top-4 right-4 z-50 bg-zinc-900 border border-zinc-800 p-2 rounded-xl shadow-xl flex items-center gap-2">
-        <span class="text-[10px] text-zinc-400 uppercase tracking-widest pl-1">Tema:</span>
-        <select id="seletorTema" onchange="mudarTema(this.value)" class="bg-black border border-zinc-800 text-zinc-200 text-xs rounded-lg p-1.5 focus:outline-none theme-focus cursor-pointer">
-            <option value="theme-padrao">Padrão (Roxo)</option>
-            <option value="theme-prime">Prime (Branco & Vermelho)</option>
-        </select>
+    <!-- BOTÃO FLUTUANTE DE TROCA DE TEMA (LUA / BOLINHA) -->
+    <div class="theme-toggle-container" onclick="alternarTema()" title="Alternar Tema (Padrão / Prime)">
+        <span class="theme-toggle-icon">🌙</span>
+        <div class="theme-toggle-switch">
+            <div class="theme-toggle-thumb"></div>
+        </div>
+        <span class="theme-toggle-icon">🔴</span>
     </div>
 
     <!-- TELA 1: LOGIN -->
@@ -750,10 +802,12 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
         </div>
 
         <script>
-            function mudarTema(tema) {
-                document.documentElement.className = tema;
-                document.body.className = `bg-black text-zinc-100 min-h-screen flex items-center justify-center p-4 selection:bg-red-600 selection:text-white font-mono ${tema}`;
-                localStorage.setItem('pecinha_theme', tema);
+            function alternarTema() {
+                const atual = document.documentElement.className || 'theme-padrao';
+                const novoTema = (atual === 'theme-prime') ? 'theme-padrao' : 'theme-prime';
+                document.documentElement.className = novoTema;
+                document.body.className = `bg-black text-zinc-100 min-h-screen flex items-center justify-center p-4 selection:bg-red-600 selection:text-white font-mono ${novoTema}`;
+                localStorage.setItem('pecinha_theme', novoTema);
             }
 
             function mudarAba(aba) {
