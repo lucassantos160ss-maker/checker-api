@@ -642,7 +642,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
                             <label class="block text-[11px] uppercase text-zinc-400 mb-1">CVV (Opcional ou Rnd)</label>
-                            <input type="text" id="genCvv" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" placeholder="Deixe em branco para aleatório ou digite ex: rnd">
+                            <input type="text" id="genCvv" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" placeholder="Deixe em branco para automático ou digite ex: rnd">
                         </div>
                         <div>
                             <label class="block text-[11px] uppercase text-zinc-400 mb-1">Quantidade</label>
@@ -705,7 +705,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                 }, 1000);
             }
 
-            // Gerador GG Lógica
+            // Gerador GG Lógica (Com suporte a 4 dígitos de CVV para American Express - Bins que começam com 34 ou 37)
             function gerarCartoesGG() {
                 let bin = document.getElementById('genBin').value.trim();
                 let mesOpt = document.getElementById('genMes').value;
@@ -721,7 +721,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                 let listaGerada = [];
                 for (let i = 0; i < qtd; i++) {
                     let cartaoTemp = bin;
-                    // Preenche com números aleatórios se tiver 'x' ou 'X' ou completa até 16 dígitos
                     cartaoTemp = cartaoTemp.replace(/[xX]/g, () => Math.floor(Math.random() * 10));
                     while (cartaoTemp.length < 16) {
                         cartaoTemp += Math.floor(Math.random() * 10);
@@ -730,7 +729,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
 
                     let mes = mesOpt === 'rnd' ? String(Math.floor(Math.random() * 12) + 1).padStart(2, '0') : mesOpt;
                     let ano = anoOpt === 'rnd' ? String(Math.floor(Math.random() * 5) + 2027) : anoOpt;
-                    let cvv = !cvvOpt || cvvOpt.toLowerCase() === 'rnd' ? String(Math.floor(Math.random() * 900) + 100) : cvvOpt;
+
+                    // Verifica se é American Express (começa com 34 ou 37) para definir 4 dígitos de CVV
+                    let limpaBin = cartaoTemp.replace(/\D/g, '');
+                    let ehAmex = limpaBin.startsWith('34') || limpaBin.startsWith('37');
+                    let tamanhoCvvDesejado = ehAmex ? 4 : 3;
+
+                    let cvv = '';
+                    if (!cvvOpt || cvvOpt.toLowerCase() === 'rnd') {
+                        if (ehAmex) {
+                            cvv = String(Math.floor(Math.random() * 9000) + 1000); // 4 dígitos para Amex (1000 a 9999)
+                        } else {
+                            cvv = String(Math.floor(Math.random() * 900) + 100);  // 3 dígitos para os demais (100 a 999)
+                        }
+                    } else {
+                        cvv = cvvOpt;
+                    }
 
                     listaGerada.push(`${cartaoTemp}|${mes}|${ano}|${cvv}`);
                 }
@@ -788,7 +802,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                     let linhaAtual = linhas[index];
                     index++;
 
-                    // Remove a linha testada do textarea para ir limpando a fila
                     textarea.value = linhas.slice(index).join('\n');
 
                     try {
@@ -823,7 +836,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                     }
 
                     if (rodandoChecker && index < linhas.length) {
-                        // Sorteia um tempo aleatório entre 17 e 29 segundos (convertido para milissegundos: 17000 a 29000)
                         let tempoEsperaMs = Math.floor(Math.random() * (29000 - 17000 + 1)) + 17000;
                         timeoutCheckerHandle = setTimeout(testarProximo, tempoEsperaMs);
                     } else {
