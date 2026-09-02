@@ -5,15 +5,17 @@
 
 session_start();
 
-// Configurações e Chaves de Acesso Válidas
+// Chave Mestre Única e Infinita (Alfanumérica)
+$CHAVE_MESTRE_INFINITA = "PECINHA2026MASTER";
+
 $CHAVES_INTERNAS = [
     '1'  => 'PECINHA-1DIA-778899',
     '7'  => 'PECINHA-7DIAS-445566',
     '15' => 'PECINHA-15DIAS-223344',
-    '30' => 'PECINHA-30DIAS-112233'
+    '30' => 'PECINHA-30DIAS-112233',
+    'infinita' => $CHAVE_MESTRE_INFINITA
 ];
 
-$SENHA_MESTRE = "PECINHA-MASTER-2026"; 
 $ERRO_LOGIN = "";
 
 // Configurações da API Elite Pay
@@ -31,10 +33,15 @@ $PLANOS = [
 
 // Gerenciamento de Tempo da Sessão
 if (isset($_SESSION['logado']) && isset($_SESSION['expira_em'])) {
-    if (time() > $_SESSION['expira_em']) {
-        session_destroy();
-        header("Location: index.php?expirado=1");
-        exit;
+    // Se for a chave mestre infinita, ignoramos a expiração de tempo padrão
+    if (isset($_SESSION['tipo_sessao']) && $_SESSION['tipo_sessao'] === 'infinita') {
+        // Sessão sem limite de tempo
+    } else {
+        if (time() > $_SESSION['expira_em']) {
+            session_destroy();
+            header("Location: index.php?expirado=1");
+            exit;
+        }
     }
 }
 
@@ -42,14 +49,19 @@ if (isset($_SESSION['logado']) && isset($_SESSION['expira_em'])) {
 if (isset($_POST['f_login'])) {
     $chave_digitada = trim($_POST['chave'] ?? '');
     $valida_ok = false;
+    $tipo_sessao = 'normal';
     
-    if ($chave_digitada === $SENHA_MESTRE || in_array($chave_digitada, array_values($CHAVES_INTERNAS))) {
+    if ($chave_digitada === $CHAVE_MESTRE_INFINITA) {
+        $valida_ok = true;
+        $tipo_sessao = 'infinita';
+    } elseif (in_array($chave_digitada, array_values($CHAVES_INTERNAS))) {
         $valida_ok = true;
     }
 
     if ($valida_ok) {
         $_SESSION['logado'] = true;
         $_SESSION['chave_utilizada'] = $chave_digitada;
+        $_SESSION['tipo_sessao'] = $tipo_sessao;
         $_SESSION['expira_em'] = time() + 86400;
         header("Location: index.php");
         exit;
@@ -256,8 +268,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     exit;
 }
 
-// Logo embutida em Base64 (SVG Otimizado do Pecinha) para nunca dar erro de arquivo não encontrado no Render
-$LOGO_BASE64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMwMDAiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NiIgZmlsbD0iIzA5MDliIiBzdHJva2U9IiM5MzMzZWEiIHN0cm9rZS13aWR0aD0iNCIvPjx0ZXh0IHg9IjUwIiB5PSI2MiIgZm9udC1mYW1pbHk9Im1vbm9zcGFjZSIgZm9udC1zaXplPSI0NSIgZm9udC13ZWlnaHQ9ImJvbGQiIGZpbGw9IiNjMDg0ZmMiIHRleHQtYW5jaG9yPSJtaWRkbGU+UDwvdGV4dD48L3N2Zz4=';
+// Logo embutida em SVG puro (Garantindo renderização 100% perfeita em qualquer navegador, mobile, Safari ou WebView do Telegram)
+$LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 100 100"><rect width="100" height="100" fill="#000"/><circle cx="50" cy="50" r="46" fill="#09090b" stroke="#9333ea" stroke-width="4"/><text x="50" y="62" font-family="monospace" font-size="45" font-weight="bold" fill="#c084fc" text-anchor="middle">P</text></svg>';
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -282,8 +294,8 @@ $LOGO_BASE64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcm
     <?php if (!isset($_SESSION['logado']) && (!isset($_GET['view']) || $_GET['view'] !== 'comprar')): ?>
         <div class="w-full max-w-md bg-zinc-900 p-8 rounded-2xl shadow-2xl border border-zinc-800 text-center card-glow">
             <div class="mb-6 flex justify-center">
-                <div style="width: 110px; height: 110px; border-radius: 50%; overflow: hidden; border: 2px solid #9333ea; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); background-color: #000;">
-                    <img src="<?php echo $LOGO_BASE64; ?>" alt="Pecinha" style="width: 100%; height: 100%; object-fit: cover;">
+                <div style="width: 110px; height: 110px; border-radius: 50%; overflow: hidden; border: 2px solid #9333ea; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); background-color: #000; display: flex; align-items: center; justify-content: center;">
+                    <?php echo $LOGO_SVG_HTML; ?>
                 </div>
             </div>
             <h1 class="text-2xl font-bold mb-1 tracking-wider text-white">CHK DO PECINHA</h1>
@@ -531,8 +543,8 @@ $LOGO_BASE64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcm
         <div class="w-full max-w-6xl bg-zinc-900 p-6 sm:p-8 rounded-2xl shadow-2xl border border-zinc-800 card-glow">
             <div class="flex flex-col sm:flex-row justify-between items-center mb-6 border-b border-zinc-800 pb-4 gap-4">
                 <div class="flex items-center gap-3">
-                    <div style="width: 42px; height: 42px; border-radius: 50%; overflow: hidden; border: 1px solid #9333ea; background-color: #000; flex-shrink: 0;">
-                        <img src="<?php echo $LOGO_BASE64; ?>" alt="Logo" style="width: 100%; height: 100%; object-fit: cover;">
+                    <div style="width: 42px; height: 42px; border-radius: 50%; overflow: hidden; border: 1px solid #9333ea; background-color: #000; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                        <?php echo $LOGO_SVG_HTML; ?>
                     </div>
                     <div>
                         <h1 class="text-xl font-bold text-white tracking-wide">CHK DO PECINHA <span class="text-xs bg-purple-600 text-white px-2 py-0.5 rounded ml-1">PRO</span></h1>
@@ -546,9 +558,9 @@ $LOGO_BASE64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcm
                         <button onclick="mudarAba('gerador')" id="tabBtnGerador" class="px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition">Gerador GG</button>
                     </div>
 
-                    <!-- Cronômetro de Sessão Ativa -->
+                    <!-- Cronômetro / Status de Sessão Ativa -->
                     <div class="bg-black border border-zinc-800 px-3 py-1.5 rounded-lg text-xs text-zinc-300">
-                        Tempo Restante: <span id="timerSessao" class="font-bold text-purple-400">24:00:00</span>
+                        Acesso: <span id="timerSessao" class="font-bold text-purple-400"><?php echo (isset($_SESSION['tipo_sessao']) && $_SESSION['tipo_sessao'] === 'infinita') ? 'INFINITA ♾️' : '24:00:00'; ?></span>
                     </div>
                     <a href="index.php?action=logout" class="bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-800 text-xs px-3 py-1.5 rounded-lg transition">Sair</a>
                 </div>
@@ -700,21 +712,25 @@ $LOGO_BASE64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcm
                 }
             }
 
-            let tempoRestanteSegundos = 86400;
-            const timerElement = document.getElementById('timerSessao');
-            if (timerElement) {
-                setInterval(() => {
-                    if (tempoRestanteSegundos > 0) {
-                        tempoRestanteSegundos--;
-                        let h = Math.floor(tempoRestanteSegundos / 3600);
-                        let m = Math.floor((tempoRestanteSegundos % 3600) / 60);
-                        let s = tempoRestanteSegundos % 60;
-                        timerElement.innerText = 
-                            String(h).padStart(2, '0') + ':' + 
-                            String(m).padStart(2, '0') + ':' + 
-                            String(s).padStart(2, '0');
-                    }
-                }, 1000);
+            // Tratamento do cronômetro para sessões normais vs infinita
+            const tipoSessaoAtual = "<?php echo $_SESSION['tipo_sessao'] ?? 'normal'; ?>";
+            if (tipoSessaoAtual !== 'infinita') {
+                let tempoRestanteSegundos = 86400;
+                const timerElement = document.getElementById('timerSessao');
+                if (timerElement) {
+                    setInterval(() => {
+                        if (tempoRestanteSegundos > 0) {
+                            tempoRestanteSegundos--;
+                            let h = Math.floor(tempoRestanteSegundos / 3600);
+                            let m = Math.floor((tempoRestanteSegundos % 3600) / 60);
+                            let s = tempoRestanteSegundos % 60;
+                            timerElement.innerText = 
+                                String(h).padStart(2, '0') + ':' + 
+                                String(m).padStart(2, '0') + ':' + 
+                                String(s).padStart(2, '0');
+                        }
+                    }, 1000);
+                }
             }
 
             function gerarCartoesGG() {
@@ -856,7 +872,7 @@ $LOGO_BASE64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcm
                 testarProximo();
             }
 
-            function pararChecker() {
+            function pararChecker`() {
                 rodandoChecker = false;
                 if (timeoutCheckerHandle) {
                     clearTimeout(timeoutCheckerHandle);
@@ -871,4 +887,3 @@ $LOGO_BASE64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcm
     <?php endif; ?>
 </body>
 </html>
-
