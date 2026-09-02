@@ -280,7 +280,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     <?php if (!isset($_SESSION['logado']) && (!isset($_GET['view']) || $_GET['view'] !== 'comprar')): ?>
         <div class="w-full max-w-md bg-zinc-900 p-8 rounded-2xl shadow-2xl border border-zinc-800 text-center card-glow">
             <div class="mb-6 flex justify-center">
-                <img src="image_327ae8.png" alt="Logotipo Pecinha" class="h-28 w-28 object-cover rounded-full border-2 border-purple-600 shadow-xl p-1 bg-black" onerror="this.src='logo.png'">
+                <div style="width: 110px; height: 110px; border-radius: 50%; overflow: hidden; border: 2px solid #9333ea; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); background-color: #000;">
+                    <img src="pecinha.png" alt="Pecinha" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='image_327ae8.png'">
+                </div>
             </div>
             <h1 class="text-2xl font-bold mb-1 tracking-wider text-white">CHK DO PECINHA</h1>
             <p class="text-xs text-purple-400 mb-4 uppercase tracking-widest">SISTEMA PREMIUM DE CHECKERS</p>
@@ -527,7 +529,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
         <div class="w-full max-w-6xl bg-zinc-900 p-6 sm:p-8 rounded-2xl shadow-2xl border border-zinc-800 card-glow">
             <div class="flex flex-col sm:flex-row justify-between items-center mb-6 border-b border-zinc-800 pb-4 gap-4">
                 <div class="flex items-center gap-3">
-                    <img src="image_327ae8.png" alt="Logo" class="h-10 w-10 object-cover rounded-full border border-purple-600 bg-black" onerror="this.style.display='none'">
+                    <div style="width: 42px; height: 42px; border-radius: 50%; overflow: hidden; border: 1px solid #9333ea; background-color: #000; flex-shrink: 0;">
+                        <img src="pecinha.png" alt="Logo" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'">
+                    </div>
                     <div>
                         <h1 class="text-xl font-bold text-white tracking-wide">CHK DO PECINHA <span class="text-xs bg-purple-600 text-white px-2 py-0.5 rounded ml-1">PRO</span></h1>
                         <span class="text-xs text-purple-400">PAINEL OPERACIONAL DE CHECKERS & GERADOR GG</span>
@@ -839,7 +843,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                             let diesEl = document.getElementById('counterDies');
                             diesEl.innerText = parseInt(diesEl.innerText) + 1;
                             let bloco = document.getElementById('blocoDies');
-                            bloco.innerHTML += `<div class="py-0.5">${data.html}</div>`;
+                            bloco.html += `<div class="py-0.5">${data.html}</div>`;
                             bloco.scrollTop = bloco.scrollHeight;
                         }
                     } catch (err) {
