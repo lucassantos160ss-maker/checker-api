@@ -705,7 +705,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                 }, 1000);
             }
 
-            // Gerador GG Lógica (Com suporte a 4 dígitos de CVV para American Express - Bins que começam com 34 ou 37)
+            // Gerador GG Lógica (Amex com 15 dígitos e 4 dígitos de CVV; Demais com 16 dígitos e 3 dígitos de CVV)
             function gerarCartoesGG() {
                 let bin = document.getElementById('genBin').value.trim();
                 let mesOpt = document.getElementById('genMes').value;
@@ -722,17 +722,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                 for (let i = 0; i < qtd; i++) {
                     let cartaoTemp = bin;
                     cartaoTemp = cartaoTemp.replace(/[xX]/g, () => Math.floor(Math.random() * 10));
-                    while (cartaoTemp.length < 16) {
+
+                    // Verifica se é American Express (começa com 34 ou 37) para definir 15 dígitos ou 16 para os demais
+                    let limpaBinInicial = cartaoTemp.replace(/\D/g, '');
+                    let ehAmex = limpaBinInicial.startsWith('34') || limpaBinInicial.startsWith('37');
+                    let tamanhoCartaoDesejado = ehAmex ? 15 : 16;
+
+                    while (cartaoTemp.length < tamanhoCartaoDesejado) {
                         cartaoTemp += Math.floor(Math.random() * 10);
                     }
-                    cartaoTemp = cartaoTemp.substring(0, 16);
+                    cartaoTemp = cartaoTemp.substring(0, tamanhoCartaoDesejado);
 
                     let mes = mesOpt === 'rnd' ? String(Math.floor(Math.random() * 12) + 1).padStart(2, '0') : mesOpt;
                     let ano = anoOpt === 'rnd' ? String(Math.floor(Math.random() * 5) + 2027) : anoOpt;
 
-                    // Verifica se é American Express (começa com 34 ou 37) para definir 4 dígitos de CVV
-                    let limpaBin = cartaoTemp.replace(/\D/g, '');
-                    let ehAmex = limpaBin.startsWith('34') || limpaBin.startsWith('37');
                     let tamanhoCvvDesejado = ehAmex ? 4 : 3;
 
                     let cvv = '';
