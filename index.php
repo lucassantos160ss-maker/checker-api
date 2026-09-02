@@ -6,7 +6,7 @@
 session_start();
 
 // Chave Mestre Única e Infinita (Alfanumérica)
-$CHAVE_MESTRE_INFINITA = "PECINHA2026MASTER";
+$CHAVE_MESTRE_INFINITA = "PECINHA2020MASTER";
 
 $CHAVES_INTERNAS = [
     '1'  => 'PECINHA-1DIA-778899',
