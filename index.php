@@ -16,9 +16,9 @@ $CHAVES_INTERNAS = [
 $SENHA_MESTRE = "A4B9X2M7K1P8"; 
 $ERRO_LOGIN = "";
 
-// Configurações da API Elite Pay corrigidas conforme a documentação oficial (Headers obrigatórios: x-client-id e x-client-secret)
+// Configurações da API Elite Pay corrigidas com as chaves fornecidas
 define('ELITE_CLIENT_ID', 'ep_684765b9795ccf41b0eb5b108b45199a');
-define('ELITE_CLIENT_SECRET', 'eps_8e432f9f1ecb62987145bdbd4f141c1c3b39dcf6e22c6f5ea270f99488577e');
+define('ELITE_CLIENT_SECRET', 'eps_8e43e32f9f1ecb62987145bdbd4f141c1c3b39dcf6e22c6f5ea270f99488577e');
 define('ELITE_BASE_URL', 'https://api.elitepaybr.com/api/v1');
 
 // Planos Disponíveis
@@ -107,7 +107,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    // Headers corrigidos exatamente conforme a documentação de Autenticação da Elite Pay
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/json',
         'x-client-id: ' . ELITE_CLIENT_ID,
