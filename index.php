@@ -16,7 +16,7 @@ $CHAVES_INTERNAS = [
 $SENHA_MESTRE = "A4B9X2M7K1P8"; 
 $ERRO_LOGIN = "";
 
-// Token fixo do Mercado Pago
+// Token fixo do Mercado Pago (Chave API integrada com sucesso)
 $MP_ACCESS_TOKEN = 'APP_USR-7217708500093011-090118-73a84adee3fb748b6be979c6ab6c133d';
 // Enviando o token via parâmetro na URL para evitar bloqueios de header do Render
 $PIX_API_URL = 'https://api.mercadopago.com/v1/payments?access_token=' . trim($MP_ACCESS_TOKEN);
