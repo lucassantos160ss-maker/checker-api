@@ -16,7 +16,7 @@ $CHAVES_INTERNAS = [
 $SENHA_MESTRE = "A4B9X2M7K1P8"; 
 $ERRO_LOGIN = "";
 
-// Configurações da API Elite Pay (Atualizada conforme a imagem enviada)
+// Configurações da API Elite Pay corrigidas conforme a documentação oficial
 define('ELITE_CLIENT_ID', 'ep_684765b9795ccf41b0eb5b108b45199a');
 define('ELITE_CLIENT_SECRET', 'eps_8e432f9f1ecb62987145bdbd4f141c1c3b39dcf6e22c6f5ea270f99488577e');
 define('ELITE_BASE_URL', 'https://api.elitepaybr.com/api/v1');
@@ -126,17 +126,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
         exit;
     }
 
+    $res_json = json_decode($response, true);
+
     if ($http_code < 200 || $http_code >= 300) {
+        $msg_erro_api = $res_json['error'] ?? $res_json['message'] ?? 'Erro desconhecido';
         echo json_encode([
             'status' => 'error', 
-            'mensagem' => 'Erro HTTP ' . $http_code . ' - Resposta: ' . $response
+            'mensagem' => 'Erro HTTP ' . $http_code . ' - Resposta: ' . $msg_erro_api
         ]);
         exit;
     }
 
-    $res_json = json_decode($response, true);
-
-    if (isset($res_json['success']) && $res_json['success'] === true) {
+    // Validação de sucesso conforme o JSON de resposta da documentação (success: true ou presença de copyPaste/transactionId)
+    if ((isset($res_json['success']) && $res_json['success'] === true) || isset($res_json['copyPaste']) || isset($res_json['transactionId'])) {
         $transactionId = $res_json['transactionId'] ?? '';
         $copia_cola = $res_json['copyPaste'] ?? '';
         $qrcode_base64 = $res_json['base64'] ?? '';
@@ -158,13 +160,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
             'payment_id' => $transactionId
         ]);
     } else {
-        $mensagem_erro = $res_json['message'] ?? 'Erro desconhecido na API Elite Pay.';
+        $mensagem_erro = $res_json['error'] ?? $res_json['message'] ?? 'Erro desconhecido na API Elite Pay.';
         echo json_encode(['status' => 'error', 'mensagem' => 'Erro Elite Pay: ' . $mensagem_erro]);
     }
     exit;
 }
 
-// Ajax: Checar Status do Pagamento
+// Ajax: Checar Status do Pagamento (Atualizado para a rota correta da documentação: /api/transactions/check)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['acao'] === 'checar_status') {
     header('Content-Type: application/json');
     $payment_id = $_POST['payment_id'] ?? '';
@@ -175,7 +177,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
         exit;
     }
 
-    $url_check = ELITE_BASE_URL . '/deposit/' . $payment_id;
+    // Rota correta informada na documentação para checagem de status
+    $url_check = 'https://api.elitepaybr.com/api/transactions/check?transactionId=' . urlencode($payment_id);
 
     $ch = curl_init($url_check);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -195,8 +198,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     $status_pago = false;
 
     if ($http_code >= 200 && $http_code < 300) {
-        $st = strtoupper($res_json['status'] ?? '');
-        if (in_array($st, ['CONCLUIDO', 'PAGO', 'APROVADO', 'PAID'])) {
+        // Conforme a documentação, o status vem dentro de transaction.transactionState ou transaction.status
+        $st = strtoupper($res_json['transaction']['transactionState'] ?? $res_json['transaction']['status'] ?? $res_json['status'] ?? '');
+        if (in_array($st, ['COMPLETO', 'CONCLUIDO', 'PAGO', 'APROVADO', 'PAID'])) {
             $status_pago = true;
         }
     }
