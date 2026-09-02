@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// CHK DO PECINHA - SISTEMA DE CHECKER COM LOJA E MERCADO PAGO PIX
+// CHK DO PECINHA - SISTEMA DE CHECKER COM LOJA E ELITE PAY PIX
 // =====================================================
 
 session_start();
@@ -16,10 +16,10 @@ $CHAVES_INTERNAS = [
 $SENHA_MESTRE = "A4B9X2M7K1P8"; 
 $ERRO_LOGIN = "";
 
-// Token fixo do Mercado Pago (Chave API integrada com sucesso)
-$MP_ACCESS_TOKEN = 'APP_USR-7217708500093011-090118-73a84adee3fb748b6be979c6ab6c133d';
-// Enviando o token via parâmetro na URL para evitar bloqueios de header do Render
-$PIX_API_URL = 'https://api.mercadopago.com/v1/payments?access_token=' . trim($MP_ACCESS_TOKEN);
+// Configurações da API Elite Pay (Atualizada conforme a imagem enviada)
+define('ELITE_CLIENT_ID', 'ep_684765b9795ccf41b0eb5b108b45199a');
+define('ELITE_CLIENT_SECRET', 'eps_8e432f9f1ecb62987145bdbd4f141c1c3b39dcf6e22c6f5ea270f99488577e');
+define('ELITE_BASE_URL', 'https://api.elitepaybr.com/api/v1');
 
 // Planos Disponíveis
 $PLANOS = [
@@ -74,14 +74,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     exit;
 }
 
-// Ajax: Gerar Pix via Mercado Pago
+// Ajax: Gerar Pix via Elite Pay
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['acao'] === 'gerar_pix') {
     header('Content-Type: application/json');
     
     $plano_id = $_POST['plano'] ?? '';
     $nome = trim($_POST['nome'] ?? '');
     $cpf = preg_replace('/\D/', '', $_POST['cpf'] ?? '');
-    $email = trim($_POST['email'] ?? '');
 
     if (!isset($PLANOS[$plano_id])) {
         echo json_encode(['status' => 'error', 'mensagem' => 'Plano inválido.']);
@@ -89,43 +88,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     }
 
     $dados_plano = $PLANOS[$plano_id];
-    
     $cpf_final = (!empty($cpf) && strlen($cpf) === 11) ? $cpf : '38553556828';
-    $email_final = !empty($email) ? $email : 'comprador_' . time() . '@gmail.com';
-    $date_of_expiration = date('c', time() + 1200); 
+    $nome_final = !empty($nome) ? $nome : 'Cliente Pecinha';
 
-    // Tratamento seguro do nome e sobrenome
-    $partes_nome = explode(' ', $nome);
-    $first_name = !empty($partes_nome[0]) ? $partes_nome[0] : 'Cliente';
-    $last_name = (count($partes_nome) > 1) ? end($partes_nome) : 'Pecinha';
-
+    $url = ELITE_BASE_URL . '/deposit';
+    
     $payload = [
-        'transaction_amount' => (float)$dados_plano['valor'],
-        'description' => "Assinatura " . $dados_plano['nome'] . " - CHK DO PECINHA",
-        'payment_method_id' => 'pix',
-        'date_of_expiration' => $date_of_expiration,
-        'payer' => [
-            'email' => $email_final,
-            'first_name' => $first_name,
-            'last_name' => $last_name,
-            'identification' => [
-                'type' => 'CPF',
-                'number' => $cpf_final
-            ]
-        ]
+        "amount" => (float)$dados_plano['valor'],
+        "description" => "Assinatura " . $dados_plano['nome'] . " - CHK DO PECINHA",
+        "payerName" => $nome_final,
+        "payerDocument" => $cpf_final
     ];
 
-    $ch = curl_init($PIX_API_URL);
+    $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0');
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/json',
-        'X-Idempotency-Key: ' . uniqid('mp_', true)
+        'x-client-id: ' . ELITE_CLIENT_ID,
+        'x-client-secret: ' . ELITE_CLIENT_SECRET
     ]);
 
     $response = curl_exec($ch);
@@ -151,27 +136,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
 
     $res_json = json_decode($response, true);
 
-    if (isset($res_json['id'])) {
-        $payment_id = $res_json['id'];
+    if (isset($res_json['success']) && $res_json['success'] === true) {
+        $transactionId = $res_json['transactionId'] ?? '';
+        $copia_cola = $res_json['copyPaste'] ?? '';
+        $qrcode_base64 = $res_json['base64'] ?? '';
         
         $_SESSION['transacao_ativa'] = [
-            'id' => $payment_id,
+            'id' => $transactionId,
             'plano' => $plano_id
         ];
 
-        $p_data = $res_json['point_of_interaction']['transaction_data'] ?? [];
-        $copia_cola = $p_data['qr_code'] ?? '';
-        $qrcode_base64 = $p_data['qr_code_base64'] ?? '';
-
-        if (empty($qrcode_base64) && !empty($copia_cola)) {
-            $qr_img_raw = @file_get_contents('https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=' . urlencode($copia_cola));
-            if ($qr_img_raw) {
-                $qrcode_base64 = base64_encode($qr_img_raw);
-            }
-        }
-
         if (empty($copia_cola)) {
-            echo json_encode(['status' => 'error', 'mensagem' => 'O Mercado Pago não retornou o código Pix Copia e Cola.']);
+            echo json_encode(['status' => 'error', 'mensagem' => 'A Elite Pay não retornou o código Pix Copia e Cola.']);
             exit;
         }
 
@@ -179,11 +155,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
             'status' => 'success',
             'qrcode' => !empty($qrcode_base64) ? 'data:image/png;base64,' . $qrcode_base64 : '',
             'copia_cola' => $copia_cola,
-            'payment_id' => $payment_id
+            'payment_id' => $transactionId
         ]);
     } else {
-        $mensagem_erro = $res_json['message'] ?? ($res_json['cause'][0]['description'] ?? 'Erro desconhecido na API.');
-        echo json_encode(['status' => 'error', 'mensagem' => 'Erro MP: ' . $mensagem_erro]);
+        $mensagem_erro = $res_json['message'] ?? 'Erro desconhecido na API Elite Pay.';
+        echo json_encode(['status' => 'error', 'mensagem' => 'Erro Elite Pay: ' . $mensagem_erro]);
     }
     exit;
 }
@@ -199,13 +175,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
         exit;
     }
 
-    $url_check = 'https://api.mercadopago.com/v1/payments/' . $payment_id . '?access_token=' . trim($MP_ACCESS_TOKEN);
+    $url_check = ELITE_BASE_URL . '/deposit/' . $payment_id;
 
     $ch = curl_init($url_check);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0');
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+        'x-client-id: ' . ELITE_CLIENT_ID,
+        'x-client-secret: ' . ELITE_CLIENT_SECRET
+    ]);
 
     $response = curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -215,8 +195,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     $status_pago = false;
 
     if ($http_code >= 200 && $http_code < 300) {
-        $st = strtolower($res_json['status'] ?? '');
-        if ($st === 'approved') {
+        $st = strtoupper($res_json['status'] ?? '');
+        if (in_array($st, ['CONCLUIDO', 'PAGO', 'APROVADO', 'PAID'])) {
             $status_pago = true;
         }
     }
@@ -391,10 +371,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                                     <label class="block text-[11px] uppercase text-zinc-400 mb-1">CPF</label>
                                     <input type="text" id="cli_cpf" required class="w-full bg-black border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" value="72115213416">
                                 </div>
-                                <div>
-                                    <label class="block text-[11px] uppercase text-zinc-400 mb-1">E-mail</label>
-                                    <input type="email" id="cli_email" required class="w-full bg-black border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" value="lucas@gmail.com">
-                                </div>
                             </div>
                             <button type="submit" id="btnGerarPix" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">
                                 Gerar QR Code Pix ➔
@@ -463,7 +439,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                     formData.append('plano', document.getElementById('inputPlanoId').value);
                     formData.append('nome', document.getElementById('cli_nome').value);
                     formData.append('cpf', document.getElementById('cli_cpf').value);
-                    formData.append('email', document.getElementById('cli_email').value);
 
                     try {
                         const response = await fetch('index.php', {
