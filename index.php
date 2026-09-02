@@ -631,11 +631,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                             <label class="block text-[11px] uppercase text-zinc-400 mb-1">Ano (Opcional)</label>
                             <select id="genAno" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none">
                                 <option value="rnd">Aleatório</option>
+                                <option value="2026">2026</option>
                                 <option value="2027">2027</option>
                                 <option value="2028">2028</option>
                                 <option value="2029">2029</option>
                                 <option value="2030">2030</option>
                                 <option value="2031">2031</option>
+                                <option value="2032">2032</option>
+                                <option value="2033">2033</option>
+                                <option value="2034">2034</option>
+                                <option value="2035">2035</option>
+                                <option value="2036">2036</option>
+                                <option value="2037">2037</option>
+                                <option value="2038">2038</option>
                             </select>
                         </div>
                     </div>
@@ -734,7 +742,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                     cartaoTemp = cartaoTemp.substring(0, tamanhoCartaoDesejado);
 
                     let mes = mesOpt === 'rnd' ? String(Math.floor(Math.random() * 12) + 1).padStart(2, '0') : mesOpt;
-                    let ano = anoOpt === 'rnd' ? String(Math.floor(Math.random() * 5) + 2027) : anoOpt;
+                    let ano = anoOpt === 'rnd' ? String(Math.floor(Math.random() * 13) + 2026) : anoOpt;
 
                     let tamanhoCvvDesejado = ehAmex ? 4 : 3;
 
