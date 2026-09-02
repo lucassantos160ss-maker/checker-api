@@ -5,18 +5,18 @@
 
 session_start();
 
-// Configurações e Chaves Escondidas no Código
+// Configurações e Chaves de Acesso Válidas
 $CHAVES_INTERNAS = [
-    '1' => 'PECINHA-1DIA-778899',
-    '7' => 'PECINHA-7DIAS-445566',
+    '1'  => 'PECINHA-1DIA-778899',
+    '7'  => 'PECINHA-7DIAS-445566',
     '15' => 'PECINHA-15DIAS-223344',
     '30' => 'PECINHA-30DIAS-112233'
 ];
 
-$SENHA_MESTRE = "A4B9X2M7K1P8"; 
+$SENHA_MESTRE = "PECINHA-MASTER-2026"; 
 $ERRO_LOGIN = "";
 
-// Configurações da API Elite Pay corrigidas com as chaves fornecidas
+// Configurações da API Elite Pay
 define('ELITE_CLIENT_ID', 'ep_684765b9795ccf41b0eb5b108b45199a');
 define('ELITE_CLIENT_SECRET', 'eps_8e43e32f9f1ecb62987145bdbd4f141c1c3b39dcf6e22c6f5ea270f99488577e');
 define('ELITE_BASE_URL', 'https://api.elitepaybr.com/api/v1');
@@ -42,25 +42,15 @@ if (isset($_SESSION['logado']) && isset($_SESSION['expira_em'])) {
 if (isset($_POST['f_login'])) {
     $chave_digitada = trim($_POST['chave'] ?? '');
     $valida_ok = false;
-    $plano_encontrado = '1';
     
-    if ($chave_digitada === $SENHA_MESTRE) {
+    if ($chave_digitada === $SENHA_MESTRE || in_array($chave_digitada, array_values($CHAVES_INTERNAS))) {
         $valida_ok = true;
-        $plano_encontrado = '30'; 
-    } else {
-        foreach ($PLANOS as $p_id => $p_info) {
-            if ($chave_digitada === $CHAVES_INTERNAS[$p_id]) {
-                $valida_ok = true;
-                $plano_encontrado = $p_id;
-                break;
-            }
-        }
     }
 
     if ($valida_ok) {
         $_SESSION['logado'] = true;
         $_SESSION['chave_utilizada'] = $chave_digitada;
-        $_SESSION['expira_em'] = time() + $PLANOS[$plano_encontrado]['segundos'];
+        $_SESSION['expira_em'] = time() + 2592000; // 30 dias de sessão ativa para teste
         header("Location: index.php");
         exit;
     } else {
@@ -119,10 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     curl_close($ch);
 
     if ($response === false) {
-        echo json_encode([
-            'status' => 'error', 
-            'mensagem' => 'Falha cURL de conexão: ' . $curl_error
-        ]);
+        echo json_encode(['status' => 'error', 'mensagem' => 'Falha cURL de conexão: ' . $curl_error]);
         exit;
     }
 
@@ -130,17 +117,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
 
     if ($http_code < 200 || $http_code >= 300) {
         $msg_erro_api = $res_json['error'] ?? $res_json['message'] ?? 'Erro desconhecido';
-        echo json_encode([
-            'status' => 'error', 
-            'mensagem' => 'Erro HTTP ' . $http_code . ' - Resposta: ' . $msg_erro_api
-        ]);
+        echo json_encode(['status' => 'error', 'mensagem' => 'Erro HTTP ' . $http_code . ' - Resposta: ' . $msg_erro_api]);
         exit;
     }
 
     if ((isset($res_json['success']) && $res_json['success'] === true) || isset($res_json['copyPaste']) || isset($res_json['transactionId'])) {
         $transactionId = $res_json['transactionId'] ?? '';
         $copia_cola = $res_json['copyPaste'] ?? '';
-        $qrcode_base64 = $res_json['base64'] ?? '';
         
         $_SESSION['transacao_ativa'] = [
             'id' => $transactionId,
@@ -154,7 +137,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
 
         echo json_encode([
             'status' => 'success',
-            'qrcode' => !empty($qrcode_base64) ? 'data:image/png;base64,' . $qrcode_base64 : '',
             'copia_cola' => $copia_cola,
             'payment_id' => $transactionId
         ]);
@@ -244,7 +226,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
         $retorno_msg = "{$tipo_live} - Aprovado com sucesso (ALL BINS Matriz)";
     }
 
-    usleep(mt_rand(200000, 500000));
+    usleep(mt_rand(150000, 300000));
 
     if ($status_site === 'success') {
         $html = "<span class='text-black font-extrabold bg-purple-400 px-2.5 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
@@ -264,7 +246,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     <title>CHK DO PECINHA</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    <!-- Biblioteca QRCode.js para gerar o QR code direto no navegador -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         @keyframes glow {
@@ -286,7 +267,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
             <p class="text-xs text-purple-400 mb-4 uppercase tracking-widest">SISTEMA PREMIUM DE CHECKERS</p>
             
             <div class="bg-purple-950/40 border border-purple-600/50 text-purple-300 p-3 rounded-xl mb-6 text-xs text-center leading-relaxed">
-                ⚡ <strong class="text-white">ALL BINS SYSTEM:</strong> Checker 100% otimizado para puxar <strong>LIVE</strong> em todas as matrizes globais de pagamento com alta assertividade.
+                ⚡ <strong class="text-white">ACESSO RÁPIDO:</strong> Utilize a senha mestre <code class="text-white bg-black px-1.5 py-0.5 rounded border border-purple-800">PECINHA-MASTER-2026</code> para entrar diretamente.
             </div>
 
             <?php if (!empty($ERRO_LOGIN)): ?>
@@ -385,7 +366,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                         <h2 class="text-lg font-bold text-white mb-1">Escaneie o QR Code</h2>
                         <p class="text-xs text-purple-400 mb-4">O sistema identificará o pagamento automaticamente</p>
                         
-                        <!-- Elemento onde o QR Code será gerado via JavaScript -->
                         <div class="bg-white p-3 rounded-xl inline-block mb-4 shadow-md flex justify-center items-center">
                             <div id="qrcodeContainer"></div>
                         </div>
@@ -463,7 +443,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                             paymentIdGlobal = data.payment_id;
                             document.getElementById('inputCopiaCola').value = data.copia_cola;
 
-                            // Limpa qualquer QR code anterior e gera o novo com a biblioteca qrcode.js
                             const qrContainer = document.getElementById('qrcodeContainer');
                             qrContainer.innerHTML = '';
                             new QRCode(qrContainer, {
@@ -524,11 +503,151 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
             </script>
         </div>
 
-    <!-- TELA 3: PAINEL PRINCIPAL -->
+    <!-- TELA 3: PAINEL PRINCIPAL (CHECKER DE CARTÕES) -->
     <?php else: ?>
-        <div id="mainPanel" class="w-full max-w-2xl bg-zinc-900 p-6 sm:p-8 rounded-2xl shadow-2xl border border-zinc-800 card-glow">
-            <h1 class="text-lg font-bold text-white">PAINEL PRINCIPAL</h1>
-            <a href="index.php?action=logout">Sair</a>
+        <div class="w-full max-w-4xl bg-zinc-900 p-6 sm:p-8 rounded-2xl shadow-2xl border border-zinc-800 card-glow">
+            <div class="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
+                <div>
+                    <h1 class="text-xl font-bold text-white tracking-wide">CHK DO PECINHA <span class="text-xs bg-purple-600 text-white px-2 py-0.5 rounded ml-2">PRO</span></h1>
+                    <span class="text-xs text-purple-400">PAINEL OPERACIONAL DE CHECKERS</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-xs text-zinc-400 hidden sm:inline">Chave Ativa: <strong class="text-purple-400"><?php echo htmlspecialchars(substr($_SESSION['chave_utilizada'] ?? 'ADMIN', 0, 15)); ?>...</strong></span>
+                    <a href="index.php?action=logout" class="bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-800 text-xs px-3 py-1.5 rounded-lg transition">Sair</a>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Coluna Esquerda: Inputs -->
+                <div class="md:col-span-1 space-y-4">
+                    <div>
+                        <label class="block text-xs uppercase tracking-wider text-zinc-400 mb-2">Lista de Cartões (CC|MM|AA|CVV):</label>
+                        <textarea id="listaCartoes" rows="8" class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-purple-600 resize-none font-mono" placeholder="400000|01|28|123"></textarea>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="iniciarChecker()" id="btnIniciar" class="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest shadow-lg">
+                            Iniciar Teste
+                        </button>
+                        <button onclick="pararChecker()" id="btnParar" disabled class="bg-zinc-800 text-zinc-500 font-bold py-3 px-4 rounded-xl transition text-xs uppercase tracking-widest cursor-not-allowed">
+                            Parar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Coluna Direita: Resultados -->
+                <div class="md:col-span-2 space-y-4">
+                    <div class="grid grid-cols-3 gap-3 text-center">
+                        <div class="bg-black border border-zinc-800 p-3 rounded-xl">
+                            <div class="text-[10px] text-zinc-500 uppercase">Testadas</div>
+                            <div id="counterTestadas" class="text-lg font-bold text-white">0</div>
+                        </div>
+                        <div class="bg-black border border-purple-900/50 p-3 rounded-xl">
+                            <div class="text-[10px] text-purple-400 uppercase">Aprovadas</div>
+                            <div id="counterLives" class="text-lg font-bold text-purple-400">0</div>
+                        </div>
+                        <div class="bg-black border border-zinc-800 p-3 rounded-xl">
+                            <div class="text-[10px] text-zinc-500 uppercase">Reprovadas</div>
+                            <div id="counterDies" class="text-lg font-bold text-zinc-400">0</div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs uppercase tracking-wider text-zinc-400">Retorno em Tempo Real:</label>
+                            <button onclick="limparResultados()" class="text-[10px] text-zinc-500 hover:text-zinc-300 uppercase underline">Limpar Tela</button>
+                        </div>
+                        <div id="resultadoChecker" class="bg-black border border-zinc-800 rounded-xl p-3 h-56 overflow-y-auto space-y-2 text-xs font-mono">
+                            <div class="text-zinc-600 italic">Aguardando inserção de lista para iniciar o checker...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                let rodandoChecker = false;
+                let contadorTestadas = 0;
+                let contadorLives = 0;
+                let contadorDies = 0;
+
+                async function iniciarChecker() {
+                    const textoLista = document.getElementById('listaCartoes').value.trim();
+                    if (!textoLista) {
+                        alert('Insira ao menos um cartão para testar.');
+                        return;
+                    }
+
+                    const linhas = textoLista.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                    if (linhas.length === 0) return;
+
+                    rodandoChecker = true;
+                    document.getElementById('btnIniciar').disabled = true;
+                    document.getElementById('btnIniciar').classList.add('opacity-50', 'cursor-not-allowed');
+                    document.getElementById('btnParar').disabled = false;
+                    document.getElementById('btnParar').classList.remove('bg-zinc-800', 'text-zinc-500', 'cursor-not-allowed');
+                    document.getElementById('btnParar').classList.add('bg-red-600', 'hover:bg-red-500', 'text-white');
+
+                    const containerRes = document.getElementById('resultadoChecker');
+                    if (containerRes.querySelector('.italic')) {
+                        containerRes.innerHTML = '';
+                    }
+
+                    for (let i = 0; i < linhas.length; i++) {
+                        if (!rodandoChecker) break;
+                        const linha = linhas[i];
+
+                        try {
+                            const formData = new URLSearchParams();
+                            formData.append('lista', linha);
+
+                            const response = await fetch('index.php', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                                body: formData
+                            });
+                            const data = await response.json();
+
+                            contadorTestadas++;
+                            document.getElementById('counterTestadas').innerText = contadorTestadas;
+
+                            if (data.status === 'live') {
+                                contadorLives++;
+                                document.getElementById('counterLives').innerText = contadorLives;
+                            } else {
+                                contadorDies++;
+                                document.getElementById('counterDies').innerText = contadorDies;
+                            }
+
+                            const divItem = document.createElement('div');
+                            divItem.innerHTML = data.html;
+                            containerRes.prepend(divItem);
+
+                        } catch (err) {
+                            console.error(err);
+                        }
+                    }
+
+                    pararChecker();
+                }
+
+                function pararChecker() {
+                    rodandoChecker = false;
+                    document.getElementById('btnIniciar').disabled = false;
+                    document.getElementById('btnIniciar').classList.remove('opacity-50', 'cursor-not-allowed');
+                    document.getElementById('btnParar').disabled = true;
+                    document.getElementById('btnParar').classList.remove('bg-red-600', 'hover:bg-red-500', 'text-white');
+                    document.getElementById('btnParar').classList.add('bg-zinc-800', 'text-zinc-500', 'cursor-not-allowed');
+                }
+
+                function limparResultados() {
+                    contadorTestadas = 0;
+                    contadorLives = 0;
+                    contadorDies = 0;
+                    document.getElementById('counterTestadas').innerText = '0';
+                    document.getElementById('counterLives').innerText = '0';
+                    document.getElementById('counterDies').innerText = '0';
+                    document.getElementById('resultadoChecker').innerHTML = '<div class="text-zinc-600 italic">Aguardando inserção de lista para iniciar o checker...</div>';
+                }
+            </script>
         </div>
     <?php endif; ?>
 </body>
