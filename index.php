@@ -33,7 +33,6 @@ $PLANOS = [
 
 // Gerenciamento de Tempo da Sessão
 if (isset($_SESSION['logado']) && isset($_SESSION['expira_em'])) {
-    // Se for a chave mestre infinita, ignoramos a expiração de tempo padrão
     if (isset($_SESSION['tipo_sessao']) && $_SESSION['tipo_sessao'] === 'infinita') {
         // Sessão sem limite de tempo
     } else {
@@ -137,6 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
         $transactionId = $res_json['transactionId'] ?? '';
         $copia_cola = $res_json['copyPaste'] ?? '';
         
+        // Salva na sessão e também retorna para o JS garantir sincronia
         $_SESSION['transacao_ativa'] = [
             'id' => $transactionId,
             'plano' => $plano_id
@@ -159,18 +159,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     exit;
 }
 
-// Ajax: Checar Status do Pagamento
+// Ajax: Checar Status do Pagamento (Corrigido para consultar corretamente a Elite Pay)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['acao'] === 'checar_status') {
     header('Content-Type: application/json');
-    $payment_id = $_POST['payment_id'] ?? '';
-    $plano_id = $_SESSION['transacao_ativa']['plano'] ?? '1';
+    $payment_id = trim($_POST['payment_id'] ?? '');
+    
+    // Se não veio por POST, tenta pegar da sessão
+    if (empty($payment_id) && isset($_SESSION['transacao_ativa']['id'])) {
+        $payment_id = $_SESSION['transacao_ativa']['id'];
+    }
+
+    $plano_id = $_POST['plano'] ?? ($_SESSION['transacao_ativa']['plano'] ?? '1');
 
     if (empty($payment_id)) {
-        echo json_encode(['status' => 'pendente']);
+        echo json_encode(['status' => 'pendente', 'mensagem' => 'ID de transação ausente']);
         exit;
     }
 
-    $url_check = 'https://api.elitepaybr.com/api/transactions/check?transactionId=' . urlencode($payment_id);
+    // Endpoint correto conforme documentação padrão da Elite Pay
+    $url_check = ELITE_BASE_URL . '/deposit/' . urlencode($payment_id);
 
     $ch = curl_init($url_check);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -190,8 +197,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     $status_pago = false;
 
     if ($http_code >= 200 && $http_code < 300) {
-        $st = strtoupper($res_json['transaction']['transactionState'] ?? $res_json['transaction']['status'] ?? $res_json['status'] ?? '');
-        if (in_array($st, ['COMPLETO', 'CONCLUIDO', 'PAGO', 'APROVADO', 'PAID'])) {
+        // Varre múltiplos campos possíveis onde a API pode retornar o status da transação
+        $st = strtoupper(
+            $res_json['transactionState'] ?? 
+            $res_json['status'] ?? 
+            $res_json['transaction']['transactionState'] ?? 
+            $res_json['transaction']['status'] ?? ''
+        );
+
+        // Aceita diversas variações de status pago da API
+        if (in_array($st, ['COMPLETO', 'CONCLUIDO', 'PAGO', 'APROVADO', 'PAID', 'APPROVED', 'CONFIRMED', 'SUCCESS'])) {
             $status_pago = true;
         }
     }
@@ -200,7 +215,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
         $chave_gerada = $CHAVES_INTERNAS[$plano_id] ?? $CHAVES_INTERNAS['1'];
         echo json_encode(['status' => 'pago', 'chave' => $chave_gerada]);
     } else {
-        echo json_encode(['status' => 'pendente']);
+        echo json_encode(['status' => 'pendente', 'debug_status' => $res_json ?? null]);
     }
     exit;
 }
@@ -268,7 +283,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     exit;
 }
 
-// Logo embutida em SVG puro (Garantindo renderização 100% perfeita em qualquer navegador, mobile, Safari ou WebView do Telegram)
+// Logo embutida em SVG puro
 $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 100 100"><rect width="100" height="100" fill="#000"/><circle cx="50" cy="50" r="46" fill="#09090b" stroke="#9333ea" stroke-width="4"/><text x="50" y="62" font-family="monospace" font-size="45" font-weight="bold" fill="#c084fc" text-anchor="middle">P</text></svg>';
 ?>
 <!DOCTYPE html>
@@ -432,8 +447,10 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
             <script>
                 let intervaloChecagem = null;
                 let paymentIdGlobal = '';
+                let planoSelecionadoGlobal = '';
 
                 function abrirCheckout(idPlano, valor, nomePlano) {
+                    planoSelecionadoGlobal = idPlano;
                     document.getElementById('inputPlanoId').value = idPlano;
                     document.getElementById('detalhePlanoModal').innerText = `Plano Escolhido: ${nomePlano} - R$ ${valor}`;
                     document.getElementById('etapaForm').classList.remove('hidden');
@@ -455,7 +472,7 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
 
                     const formData = new URLSearchParams();
                     formData.append('acao', 'gerar_pix');
-                    formData.append('plano', document.getElementById('inputPlanoId').value);
+                    formData.append('plano', planoSelecionadoGlobal);
                     formData.append('nome', document.getElementById('cli_nome').value);
                     formData.append('cpf', document.getElementById('cli_cpf').value);
 
@@ -492,7 +509,9 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                             document.getElementById('etapaForm').classList.add('hidden');
                             document.getElementById('etapaPix').classList.remove('hidden');
 
-                            intervaloChecagem = setInterval(checarStatusPagamento, 4000);
+                            // Inicia a checagem automática a cada 3 segundos
+                            if (intervaloChecagem) clearInterval(intervaloChecagem);
+                            intervaloChecagem = setInterval(checarStatusPagamento, 3000);
                         } else {
                             alert('Erro: ' + (data.mensagem || 'Erro desconhecido.'));
                         }
@@ -506,9 +525,11 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
 
                 async function checarStatusPagamento() {
                     if (!paymentIdGlobal) return;
+                    
                     const formData = new URLSearchParams();
                     formData.append('acao', 'checar_status');
                     formData.append('payment_id', paymentIdGlobal);
+                    formData.append('plano', planoSelecionadoGlobal);
 
                     try {
                         const response = await fetch('index.php', {
@@ -517,6 +538,7 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                             body: formData
                         });
                         const data = await response.json();
+                        
                         if (data.status === 'pago') {
                             clearInterval(intervaloChecagem);
                             document.getElementById('inputChaveLiberada').value = data.chave;
@@ -526,7 +548,9 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                                 confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
                             }
                         }
-                    } catch (e) {}
+                    } catch (e) {
+                        console.error("Erro ao checar status:", e);
+                    }
                 }
 
                 function copiarPix() {
@@ -552,13 +576,11 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                     </div>
                 </div>
                 <div class="flex items-center gap-3 flex-wrap justify-end">
-                    <!-- Abas de Navegação interna (Checker vs Gerador) -->
                     <div class="flex bg-black border border-zinc-800 rounded-xl p-1">
                         <button onclick="mudarAba('checker')" id="tabBtnChecker" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-600 text-white transition">Checker</button>
                         <button onclick="mudarAba('gerador')" id="tabBtnGerador" class="px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition">Gerador GG</button>
                     </div>
 
-                    <!-- Cronômetro / Status de Sessão Ativa -->
                     <div class="bg-black border border-zinc-800 px-3 py-1.5 rounded-lg text-xs text-zinc-300">
                         Acesso: <span id="timerSessao" class="font-bold text-purple-400"><?php echo (isset($_SESSION['tipo_sessao']) && $_SESSION['tipo_sessao'] === 'infinita') ? 'INFINITA ♾️' : '24:00:00'; ?></span>
                     </div>
@@ -568,7 +590,6 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
 
             <!-- SEÇÃO 1: PAINEL DO CHECKER -->
             <div id="secaoChecker" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <!-- Coluna Esquerda: Inputs e Botões (Largura 4/12) -->
                 <div class="lg:col-span-4 space-y-4">
                     <div>
                         <label class="block text-xs uppercase tracking-wider text-zinc-400 mb-2">Lista de Cartões (CC|MM|AA|CVV):</label>
@@ -582,13 +603,11 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                             Parar
                         </button>
                     </div>
-                    <!-- Botão de Atalho para o Gerador -->
                     <button onclick="mudarAba('gerador')" class="w-full bg-zinc-800 hover:bg-zinc-700 text-purple-400 font-bold py-2.5 rounded-xl transition text-xs uppercase tracking-widest border border-zinc-700">
                         ⚡ Ir para o Gerador GG
                     </button>
                 </div>
 
-                <!-- Coluna Direita: Contadores e Telas Separadas Lado a Lado (Largura 8/12) -->
                 <div class="lg:col-span-8 space-y-4">
                     <div class="grid grid-cols-3 gap-3 text-center">
                         <div class="bg-black border border-zinc-800 p-3 rounded-xl">
@@ -605,9 +624,7 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                         </div>
                     </div>
 
-                    <!-- Divisão Lado a Lado: Esquerda Lives, Direita Dies -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <!-- Bloco Esquerdo: Lives -->
                         <div>
                             <div class="flex justify-between items-center mb-1">
                                 <label class="text-[11px] uppercase tracking-wider text-purple-400 font-bold">🟢 Retorno Lives:</label>
@@ -615,7 +632,6 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                             </div>
                             <div id="blocoLives" class="w-full h-64 bg-black border border-purple-900/40 rounded-xl p-3 text-xs overflow-y-auto font-mono space-y-1"></div>
                         </div>
-                        <!-- Bloco Direito: Dies -->
                         <div>
                             <div class="flex justify-between items-center mb-1">
                                 <label class="text-[11px] uppercase tracking-wider text-zinc-500 font-bold">🔴 Retorno Dies:</label>
@@ -649,26 +665,16 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                             <label class="block text-[11px] uppercase text-zinc-400 mb-1">Ano (Opcional)</label>
                             <select id="genAno" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none">
                                 <option value="rnd">Aleatório</option>
-                                <option value="2026">2026</option>
-                                <option value="2027">2027</option>
-                                <option value="2028">2028</option>
-                                <option value="2029">2029</option>
-                                <option value="2030">2030</option>
-                                <option value="2031">2031</option>
-                                <option value="2032">2032</option>
-                                <option value="2033">2033</option>
-                                <option value="2034">2034</option>
-                                <option value="2035">2035</option>
-                                <option value="2036">2036</option>
-                                <option value="2037">2037</option>
-                                <option value="2038">2038</option>
+                                <option value="2026">2026</option><option value="2027">2027</option><option value="2028">2028</option><option value="2029">2029</option>
+                                <option value="2030">2030</option><option value="2031">2031</option><option value="2032">2032</option><option value="2033">2033</option>
+                                <option value="2034">2034</option><option value="2035">2035</option><option value="2036">2036</option><option value="2037">2037</option><option value="2038">2038</option>
                             </select>
                         </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
                             <label class="block text-[11px] uppercase text-zinc-400 mb-1">CVV (Opcional ou Rnd)</label>
-                            <input type="text" id="genCvv" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" placeholder="Deixe em branco para automático ou digite ex: rnd">
+                            <input type="text" id="genCvv" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 focus:border-purple-600 focus:outline-none" placeholder="Deixe em branco para automático">
                         </div>
                         <div>
                             <label class="block text-[11px] uppercase text-zinc-400 mb-1">Quantidade</label>
@@ -712,7 +718,6 @@ $LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="1
                 }
             }
 
-            // Tratamento do cronômetro para sessões normais vs infinita
             const tipoSessaoAtual = "<?php echo $_SESSION['tipo_sessao'] ?? 'normal'; ?>";
             if (tipoSessaoAtual !== 'infinita') {
                 let tempoRestanteSegundos = 86400;
