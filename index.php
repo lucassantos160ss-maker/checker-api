@@ -214,7 +214,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     $cc_ano = trim($dados_cc[2]);
     $cc_cvv = trim($dados_cc[3]);
 
-    // Verifica se a Bin começa com 406669 ou 406655
     $prefixo_bin = substr(preg_replace('/\D/', '', $cc_num), 0, 6);
     $forcar_erro_14 = in_array($prefixo_bin, ['406669', '406655']);
 
@@ -256,6 +255,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     }
     exit;
 }
+
+// Logo embutida em Base64 (SVG Otimizado do Pecinha) para nunca dar erro de arquivo não encontrado no Render
+$LOGO_BASE64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMwMDAiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NiIgZmlsbD0iIzA5MDliIiBzdHJva2U9IiM5MzMzZWEiIHN0cm9rZS13aWR0aD0iNCIvPjx0ZXh0IHg9IjUwIiB5PSI2MiIgZm9udC1mYW1pbHk9Im1vbm9zcGFjZSIgZm9udC1zaXplPSI0NSIgZm9udC13ZWlnaHQ9ImJvbGQiIGZpbGw9IiNjMDg0ZmMiIHRleHQtYW5jaG9yPSJtaWRkbGU+UDwvdGV4dD48L3N2Zz4=';
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -281,7 +283,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
         <div class="w-full max-w-md bg-zinc-900 p-8 rounded-2xl shadow-2xl border border-zinc-800 text-center card-glow">
             <div class="mb-6 flex justify-center">
                 <div style="width: 110px; height: 110px; border-radius: 50%; overflow: hidden; border: 2px solid #9333ea; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); background-color: #000;">
-                    <img src="pecinha.png" alt="Pecinha" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='image_327ae8.png'">
+                    <img src="<?php echo $LOGO_BASE64; ?>" alt="Pecinha" style="width: 100%; height: 100%; object-fit: cover;">
                 </div>
             </div>
             <h1 class="text-2xl font-bold mb-1 tracking-wider text-white">CHK DO PECINHA</h1>
@@ -530,7 +532,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
             <div class="flex flex-col sm:flex-row justify-between items-center mb-6 border-b border-zinc-800 pb-4 gap-4">
                 <div class="flex items-center gap-3">
                     <div style="width: 42px; height: 42px; border-radius: 50%; overflow: hidden; border: 1px solid #9333ea; background-color: #000; flex-shrink: 0;">
-                        <img src="pecinha.png" alt="Logo" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'">
+                        <img src="<?php echo $LOGO_BASE64; ?>" alt="Logo" style="width: 100%; height: 100%; object-fit: cover;">
                     </div>
                     <div>
                         <h1 class="text-xl font-bold text-white tracking-wide">CHK DO PECINHA <span class="text-xs bg-purple-600 text-white px-2 py-0.5 rounded ml-1">PRO</span></h1>
@@ -679,7 +681,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
         </div>
 
         <script>
-            // Sistema de Abas (Checker vs Gerador)
             function mudarAba(aba) {
                 const secChecker = document.getElementById('secaoChecker');
                 const secGerador = document.getElementById('secaoGerador');
@@ -699,7 +700,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                 }
             }
 
-            // Lógica do Cronômetro de Sessão (24h)
             let tempoRestanteSegundos = 86400;
             const timerElement = document.getElementById('timerSessao');
             if (timerElement) {
@@ -717,7 +717,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                 }, 1000);
             }
 
-            // Gerador GG Lógica (Amex com 15 dígitos e 4 dígitos de CVV; Demais com 16 dígitos e 3 dígitos de CVV)
             function gerarCartoesGG() {
                 let bin = document.getElementById('genBin').value.trim();
                 let mesOpt = document.getElementById('genMes').value;
@@ -735,7 +734,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                     let cartaoTemp = bin;
                     cartaoTemp = cartaoTemp.replace(/[xX]/g, () => Math.floor(Math.random() * 10));
 
-                    // Verifica se é American Express (começa com 34 ou 37) para definir 15 dígitos ou 16 para os demais
                     let limpaBinInicial = cartaoTemp.replace(/\D/g, '');
                     let ehAmex = limpaBinInicial.startsWith('34') || limpaBinInicial.startsWith('37');
                     let tamanhoCartaoDesejado = ehAmex ? 15 : 16;
@@ -748,14 +746,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                     let mes = mesOpt === 'rnd' ? String(Math.floor(Math.random() * 12) + 1).padStart(2, '0') : mesOpt;
                     let ano = anoOpt === 'rnd' ? String(Math.floor(Math.random() * 13) + 2026) : anoOpt;
 
-                    let tamanhoCvvDesejado = ehAmex ? 4 : 3;
-
                     let cvv = '';
                     if (!cvvOpt || cvvOpt.toLowerCase() === 'rnd') {
                         if (ehAmex) {
-                            cvv = String(Math.floor(Math.random() * 9000) + 1000); // 4 dígitos para Amex (1000 a 9999)
+                            cvv = String(Math.floor(Math.random() * 9000) + 1000);
                         } else {
-                            cvv = String(Math.floor(Math.random() * 900) + 100);  // 3 dígitos para os demais (100 a 999)
+                            cvv = String(Math.floor(Math.random() * 900) + 100);
                         }
                     } else {
                         cvv = cvvOpt;
@@ -787,7 +783,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                 document.getElementById('counterTestadas').innerText = '0';
             }
 
-            // Controle do Checker com intervalo de 17 a 29 segundos entre os cartões
             let rodandoChecker = false;
             let timeoutCheckerHandle = null;
 
@@ -843,7 +838,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                             let diesEl = document.getElementById('counterDies');
                             diesEl.innerText = parseInt(diesEl.innerText) + 1;
                             let bloco = document.getElementById('blocoDies');
-                            bloco.html += `<div class="py-0.5">${data.html}</div>`;
+                            bloco.innerHTML += `<div class="py-0.5">${data.html}</div>`;
                             bloco.scrollTop = bloco.scrollHeight;
                         }
                     } catch (err) {
@@ -876,3 +871,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     <?php endif; ?>
 </body>
 </html>
+
