@@ -1,6 +1,6 @@
 <?php
 // =====================================================
-// CHK DO PECINHA - SISTEMA DE CHECKER COM LOJA E ELITE PAY PIX
+// CHK DO PECINHA - SISTEMA DE CHECKER COM LOJA, GERADOR E ELITE PAY PIX
 // =====================================================
 
 session_start();
@@ -38,7 +38,7 @@ if (isset($_SESSION['logado']) && isset($_SESSION['expira_em'])) {
     }
 }
 
-// Ação de Login Principal (Sempre reinicia o tempo para 24 horas cheias ao relogar)
+// Ação de Login Principal
 if (isset($_POST['f_login'])) {
     $chave_digitada = trim($_POST['chave'] ?? '');
     $valida_ok = false;
@@ -50,7 +50,7 @@ if (isset($_POST['f_login'])) {
     if ($valida_ok) {
         $_SESSION['logado'] = true;
         $_SESSION['chave_utilizada'] = $chave_digitada;
-        $_SESSION['expira_em'] = time() + 86400; // Reseta exatamente para 24 horas ao relogar
+        $_SESSION['expira_em'] = time() + 86400;
         header("Location: index.php");
         exit;
     } else {
@@ -193,7 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     exit;
 }
 
-// Ajax: Checker de Cartões (Retorno N7 configurado como Live + 20 a 25 segundos)
+// Ajax: Checker de Cartões
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     header('Content-Type: application/json');
     if (!isset($_SESSION['logado'])) {
@@ -214,7 +214,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     $cc_ano = trim($dados_cc[2]);
     $cc_cvv = trim($dados_cc[3]);
 
-    // Probabilidade de aprovação de ~15% (incluindo N7 como Live)
     mt_srand();
     $chance = mt_rand(1, 100);
 
@@ -238,7 +237,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
         $retorno_msg = $retornos_lives[array_rand($retornos_lives)];
     }
 
-    // Atraso de 20 a 25 segundos por checagem
     usleep(mt_rand(20000000, 25000000));
 
     if ($status_site === 'success') {
@@ -516,18 +514,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
             </script>
         </div>
 
-    <!-- TELA 3: PAINEL PRINCIPAL (CHECKER DE CARTÕES) -->
+    <!-- TELA 3: PAINEL PRINCIPAL (CHECKER + GERADOR GG INTEGRADO) -->
     <?php else: ?>
-        <div class="w-full max-w-5xl bg-zinc-900 p-6 sm:p-8 rounded-2xl shadow-2xl border border-zinc-800 card-glow">
+        <div class="w-full max-w-6xl bg-zinc-900 p-6 sm:p-8 rounded-2xl shadow-2xl border border-zinc-800 card-glow">
             <div class="flex flex-col sm:flex-row justify-between items-center mb-6 border-b border-zinc-800 pb-4 gap-4">
                 <div class="flex items-center gap-3">
                     <img src="image_327ae8.png" alt="Logo" class="h-10 w-10 object-cover rounded-full border border-purple-600 bg-black" onerror="this.style.display='none'">
                     <div>
                         <h1 class="text-xl font-bold text-white tracking-wide">CHK DO PECINHA <span class="text-xs bg-purple-600 text-white px-2 py-0.5 rounded ml-1">PRO</span></h1>
-                        <span class="text-xs text-purple-400">PAINEL OPERACIONAL DE CHECKERS</span>
+                        <span class="text-xs text-purple-400">PAINEL OPERACIONAL DE CHECKERS & GERADOR GG</span>
                     </div>
                 </div>
                 <div class="flex items-center gap-3 flex-wrap justify-end">
+                    <!-- Abas de Navegação interna (Checker vs Gerador) -->
+                    <div class="flex bg-black border border-zinc-800 rounded-xl p-1">
+                        <button onclick="mudarAba('checker')" id="tabBtnChecker" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-600 text-white transition">Checker</button>
+                        <button onclick="mudarAba('gerador')" id="tabBtnGerador" class="px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition">Gerador GG</button>
+                    </div>
+
                     <!-- Cronômetro de Sessão Ativa -->
                     <div class="bg-black border border-zinc-800 px-3 py-1.5 rounded-lg text-xs text-zinc-300">
                         Tempo Restante: <span id="timerSessao" class="font-bold text-purple-400">24:00:00</span>
@@ -536,12 +540,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <!-- Coluna Esquerda: Inputs -->
-                <div class="md:col-span-1 space-y-4">
+            <!-- SEÇÃO 1: PAINEL DO CHECKER -->
+            <div id="secaoChecker" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Coluna Esquerda: Inputs e Botões (Largura 4/12) -->
+                <div class="lg:col-span-4 space-y-4">
                     <div>
                         <label class="block text-xs uppercase tracking-wider text-zinc-400 mb-2">Lista de Cartões (CC|MM|AA|CVV):</label>
-                        <textarea id="listaCartoes" rows="8" class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-purple-600 resize-none font-mono" placeholder="400000|01|28|123"></textarea>
+                        <textarea id="listaCartoes" rows="10" class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-purple-600 resize-none font-mono" placeholder="400000|01|28|123"></textarea>
                     </div>
                     <div class="flex gap-2">
                         <button onclick="iniciarChecker()" id="btnIniciar" class="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest shadow-lg">
@@ -551,10 +556,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                             Parar
                         </button>
                     </div>
+                    <!-- Botão de Atalho para o Gerador -->
+                    <button onclick="mudarAba('gerador')" class="w-full bg-zinc-800 hover:bg-zinc-700 text-purple-400 font-bold py-2.5 rounded-xl transition text-xs uppercase tracking-widest border border-zinc-700">
+                        ⚡ Ir para o Gerador GG
+                    </button>
                 </div>
 
-                <!-- Coluna Direita: Resultados em Dois Blocos Separados (Lives / Dies) -->
-                <div class="md:col-span-2 space-y-4">
+                <!-- Coluna Direita: Contadores e Telas Separadas Lado a Lado (Largura 8/12) -->
+                <div class="lg:col-span-8 space-y-4">
                     <div class="grid grid-cols-3 gap-3 text-center">
                         <div class="bg-black border border-zinc-800 p-3 rounded-xl">
                             <div class="text-[10px] text-zinc-500 uppercase">Testadas</div>
@@ -570,24 +579,95 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <!-- Bloco 1: Aprovadas (Lives) -->
+                    <!-- Divisão Lado a Lado: Esquerda Lives, Direita Dies -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Bloco Esquerdo: Lives -->
                         <div>
                             <div class="flex justify-between items-center mb-1">
-                                <label class="text-[11px] uppercase tracking-wider text-purple-400 font-bold">🟢 Aprovadas (Lives):</label>
+                                <label class="text-[11px] uppercase tracking-wider text-purple-400 font-bold">🟢 Retorno Lives:</label>
+                                <button onclick="limparBloco('blocoLives')" class="text-[10px] text-zinc-500 hover:text-zinc-300">Limpar</button>
                             </div>
-                            <div id="blocoLives" class="bg-black border border-purple-900/40 rounded-xl p-3 h-52 overflow-y-auto space-y-2 text-xs font-mono">
-                                <div class="text-zinc-600 italic">Nenhuma live até o momento...</div>
+                            <div id="blocoLives" class="bg-black border border-purple-900/40 rounded-xl p-3 h-64 overflow-y-auto space-y-2 text-xs font-mono">
+                                <div class="text-zinc-600 italic">Aguardando lives...</div>
                             </div>
                         </div>
 
-                        <!-- Bloco 2: Reprovadas (Dies) -->
+                        <!-- Bloco Direito: Dies -->
                         <div>
                             <div class="flex justify-between items-center mb-1">
-                                <label class="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">🔴 Reprovadas (Dies):</label>
+                                <label class="text-[11px] uppercase tracking-wider text-zinc-400 font-bold">🔴 Retorno Dies:</label>
+                                <button onclick="limparBloco('blocoDies')" class="text-[10px] text-zinc-500 hover:text-zinc-300">Limpar</button>
                             </div>
-                            <div id="blocoDies" class="bg-black border border-zinc-800 rounded-xl p-3 h-52 overflow-y-auto space-y-2 text-xs font-mono">
-                                <div class="text-zinc-600 italic">Nenhuma die até o momento...</div>
+                            <div id="blocoDies" class="bg-black border border-zinc-800 rounded-xl p-3 h-64 overflow-y-auto space-y-2 text-xs font-mono">
+                                <div class="text-zinc-600 italic">Aguardando dies...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SEÇÃO 2: GERADOR GG (Estilo idêntico à referência solicitada) -->
+            <div id="secaoGerador" class="hidden">
+                <div class="text-center mb-6">
+                    <h2 class="text-xl font-bold tracking-widest text-white uppercase">GERADOR GG</h2>
+                    <span class="text-xs text-purple-400">Gere cartões com base em suas Bins</span>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Controles do Gerador (4/12) -->
+                    <div class="lg:col-span-5 space-y-4">
+                        <div>
+                            <label class="block text-xs uppercase tracking-wider text-purple-400 mb-1 font-bold">Bins</label>
+                            <input type="text" id="genBin" placeholder="Digite sua bin" class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-purple-600 font-mono">
+                            <span class="text-[10px] text-zinc-500 mt-1 block">* Utilize com moderação;</span>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs uppercase tracking-wider text-purple-400 mb-1 font-bold">Data (Mês)</label>
+                                <select id="genMes" class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-purple-600">
+                                    <option value="rnd">MÊS (Aleatório)</option>
+                                    <option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option>
+                                    <option value="05">05</option><option value="06">06</option><option value="07">07</option><option value="08">08</option>
+                                    <option value="09">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs uppercase tracking-wider text-purple-400 mb-1 font-bold">Ano</label>
+                                <select id="genAno" class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-purple-600">
+                                    <option value="rnd">ANO</option>
+                                    <option value="26">2026</option><option value="27">2027</option><option value="28">2028</option>
+                                    <option value="29">2029</option><option value="30">2030</option><option value="31">2031</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs uppercase tracking-wider text-purple-400 mb-1 font-bold">CVV</label>
+                            <input type="text" id="genCvv" placeholder="XXX" maxlength="4" class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-purple-600 font-mono">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs uppercase tracking-wider text-purple-400 mb-1 font-bold">Quantidade</label>
+                            <input type="number" id="genQtd" value="10" min="1" max="100" class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-purple-600 font-mono">
+                        </div>
+
+                        <button onclick="executarGerador()" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3.5 rounded-xl transition text-xs uppercase tracking-widest shadow-lg">
+                            Gerar
+                        </button>
+                    </div>
+
+                    <!-- Tela de Saída e Botão Copiar (7/12) -->
+                    <div class="lg:col-span-7 flex flex-col justify-between space-y-4">
+                        <div>
+                            <textarea id="genSaida" readonly rows="12" class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-xs text-zinc-300 font-mono resize-none select-all" placeholder="XXXXXXXXXXXXXXXX|XX|XX|XXX"></textarea>
+                        </div>
+                        <div class="space-y-2">
+                            <button onclick="copiarGerador()" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest shadow-lg">
+                                Copiar GG
+                            </button>
+                            <div class="text-center text-[10px] text-zinc-500 uppercase tracking-widest pt-2">
+                                Créditos
                             </div>
                         </div>
                     </div>
@@ -595,7 +675,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
             </div>
 
             <script>
-                // Cronômetro Regressivo sempre inicia limpo em 24:00:00 ao relogar
+                // Alternar abas Checker / Gerador
+                function mudarAba(aba) {
+                    const secChecker = document.getElementById('secaoChecker');
+                    const secGerador = document.getElementById('secaoGerador');
+                    const btnChecker = document.getElementById('tabBtnChecker');
+                    const btnGerador = document.getElementById('tabBtnGerador');
+
+                    if (aba === 'checker') {
+                        secChecker.classList.remove('hidden');
+                        secGerador.classList.add('hidden');
+                        btnChecker.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-600 text-white transition";
+                        btnGerador.className = "px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition";
+                    } else {
+                        secChecker.classList.add('hidden');
+                        secGerador.classList.remove('hidden');
+                        btnGerador.className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-600 text-white transition";
+                        btnChecker.className = "px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition";
+                    }
+                }
+
+                // Algoritmo de Luhn para gerar cartões válidos com base na Bin
+                function luhnChecksum(stringNum) {
+                    let arr = stringNum.split('').reverse().map(x => parseInt(x));
+                    let sum = arr.reduce((acc, val, idx) => {
+                        if (idx % 2 !== 0) {
+                            val *= 2;
+                            if (val > 9) val -= 9;
+                        }
+                        return acc + val;
+                    }, 0);
+                    return (10 - (sum % 10)) % 10;
+                }
+
+                function gerarNumeroCC(binBase, tamanho = 16) {
+                    let cc = binBase.replace(/\D/g, '');
+                    while (cc.length < tamanho - 1) {
+                        cc += Math.floor(Math.random() * 10);
+                    }
+                    let digitoVerificador = luhnChecksum(cc + '0');
+                    return cc + digitoVerificador;
+                }
+
+                function executarGerador() {
+                    let binInput = document.getElementById('genBin').value.trim();
+                    if (!binInput || binInput.length < 4) {
+                        alert('Por favor, digite uma Bin válida (mínimo 4 dígitos).');
+                        return;
+                    }
+
+                    let mesSel = document.getElementById('genMes').value;
+                    let anoSel = document.getElementById('genAno').value;
+                    let cvvInput = document.getElementById('genCvv').value.trim();
+                    let qtd = parseInt(document.getElementById('genQtd').value) || 10;
+
+                    let resultados = [];
+                    for (let i = 0; i < qtd; i++) {
+                        let numCC = gerarNumeroCC(binInput, binInput.length >= 15 ? binInput.length : 16);
+                        
+                        let mes = mesSel === 'rnd' ? String(Math.floor(Math.random() * 12) + 1).padStart(2, '0') : mesSel;
+                        let ano = anoSel === 'rnd' ? String(Math.floor(Math.random() * 6) + 26) : anoSel;
+                        
+                        let cvv = cvvInput;
+                        if (!cvv || cvv.length < 3) {
+                            cvv = String(Math.floor(Math.random() * 900) + 100);
+                        }
+
+                        resultados.push(`${numCC}|${mes}|${ano}|${cvv}`);
+                    }
+
+                    document.getElementById('genSaida').value = resultados.join('\n');
+                }
+
+                function copiarGerador() {
+                    const textarea = document.getElementById('genSaida');
+                    textarea.select();
+                    navigator.clipboard.writeText(textarea.value);
+                    alert('Lista gerada copiada com sucesso!');
+                }
+
+                // Cronômetro Regressivo
                 let tempoRestanteSegundos = 86400; 
                 const timerElement = document.getElementById('timerSessao');
                 
@@ -618,6 +777,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                 let contadorTestadas = 0;
                 let contadorLives = 0;
                 let contadorDies = 0;
+
+                function limparBloco(idElemento) {
+                    const el = document.getElementById(idElemento);
+                    const tipo = idElemento === 'blocoLives' ? 'lives' : 'dies';
+                    el.innerHTML = `<div class="text-zinc-600 italic">Aguardando ${tipo}...</div>`;
+                }
 
                 async function iniciarChecker() {
                     const textoLista = document.getElementById('listaCartoes').value.trim();
