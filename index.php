@@ -220,19 +220,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     if ($chance <= 85) {
         $status_site = 'failed';
         $retornos_dies = [
-            "14 die - Transação não autorizada / Saldo insuficiente",
-            "51 die - Saldo insuficiente",
-            "57 die - Cartão Vencido ou Inválido",
-            "05 die - Transação não autorizada pelo banco"
+            "Erro: Transação negada",
+            "Erro: Transação negada pelo emissor",
+            "Transação negada",
+            "Erro: Transação recusada / Negada"
         ];
         $retorno_msg = $retornos_dies[array_rand($retornos_dies)];
     } else {
         $status_site = 'success';
+        $valor_debitado = number_format(mt_rand(100, 2300) / 100, 2, ',', '.');
         $retornos_lives = [
-            "N7 live - Aprovado com sucesso / Validação CVV Ok",
-            "Aprovado com sucesso (R$ 1,00 cobrado)",
-            "Aprovado (Aura / Mastercard)",
-            "Aprovado com saldo (Visa Matriz)"
+            "1001 live - Aprovado com sucesso / Debitado R$ {$valor_debitado}",
+            "1001 live - Transação aprovada (R$ {$valor_debitado} cobrado)",
+            "1001 live - Aprovado (R$ {$valor_debitado})"
         ];
         $retorno_msg = $retornos_lives[array_rand($retornos_lives)];
     }
