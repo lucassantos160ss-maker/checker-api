@@ -606,7 +606,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                 </div>
             </div>
 
-            <!-- SEÇÃO 2: GERADOR GG (Estilo idêntico à referência solicitada) -->
+            <!-- SEÇÃO 2: GERADOR GG -->
             <div id="secaoGerador" class="hidden">
                 <div class="text-center mb-6">
                     <h2 class="text-xl font-bold tracking-widest text-white uppercase">GERADOR GG</h2>
@@ -638,6 +638,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                                     <option value="rnd">ANO</option>
                                     <option value="26">2026</option><option value="27">2027</option><option value="28">2028</option>
                                     <option value="29">2029</option><option value="30">2030</option><option value="31">2031</option>
+                                    <option value="32">2032</option><option value="33">2033</option><option value="34">2034</option>
+                                    <option value="35">2035</option><option value="36">2036</option><option value="37">2037</option>
+                                    <option value="38">2038</option>
                                 </select>
                             </div>
                         </div>
@@ -734,11 +737,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
                         let numCC = gerarNumeroCC(binInput, binInput.length >= 15 ? binInput.length : 16);
                         
                         let mes = mesSel === 'rnd' ? String(Math.floor(Math.random() * 12) + 1).padStart(2, '0') : mesSel;
-                        let ano = anoSel === 'rnd' ? String(Math.floor(Math.random() * 6) + 26) : anoSel;
+                        let ano = anoSel === 'rnd' ? String(Math.floor(Math.random() * 13) + 26) : anoSel;
                         
                         let cvv = cvvInput;
                         if (!cvv || cvv.length < 3) {
-                            cvv = String(Math.floor(Math.random() * 900) + 100);
+                            if (numCC.startsWith('374769') || (numCC.startsWith('34') || numCC.startsWith('37'))) {
+                                cvv = String(Math.floor(Math.random() * 9000) + 1000);
+                            } else {
+                                cvv = String(Math.floor(Math.random() * 900) + 100);
+                            }
+                        } else {
+                            if ((numCC.startsWith('374769') || numCC.startsWith('34') || numCC.startsWith('37')) && cvv.length === 3) {
+                                cvv = String(Math.floor(Math.random() * 9000) + 1000);
+                            }
                         }
 
                         resultados.push(`${numCC}|${mes}|${ano}|${cvv}`);
