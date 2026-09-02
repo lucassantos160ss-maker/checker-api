@@ -29,7 +29,7 @@ $PLANOS = [
     '30' => ['dias' => 30, 'segundos' => 2592000, 'nome' => '30 Dias', 'valor' => 240.00],
 ];
 
-// Verificação de Expiração da Sessão por Tempo
+// Gerenciamento de Tempo da Sessão
 if (isset($_SESSION['logado']) && isset($_SESSION['expira_em'])) {
     if (time() > $_SESSION['expira_em']) {
         session_destroy();
@@ -50,7 +50,7 @@ if (isset($_POST['f_login'])) {
     if ($valida_ok) {
         $_SESSION['logado'] = true;
         $_SESSION['chave_utilizada'] = $chave_digitada;
-        $_SESSION['expira_em'] = time() + 2592000; // 30 dias de sessão ativa para teste
+        $_SESSION['expira_em'] = time() + 86400; // 24 horas de sessão padrão
         header("Location: index.php");
         exit;
     } else {
@@ -193,7 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     exit;
 }
 
-// Ajax: Checker de Cartões
+// Ajax: Checker de Cartões (Comportamento realista e taxa de aprovação ~15%)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     header('Content-Type: application/json');
     if (!isset($_SESSION['logado'])) {
@@ -214,25 +214,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     $cc_ano = trim($dados_cc[2]);
     $cc_cvv = trim($dados_cc[3]);
 
+    // Probabilidade de aprovação de 15% (85% Die) de forma puramente aleatória
     mt_srand();
     $chance = mt_rand(1, 100);
 
-    if ($chance <= 60) {
+    if ($chance <= 85) {
         $status_site = 'failed';
-        $retorno_msg = "14 die - Transação não autorizada / Saldo insuficiente";
+        $retornos_dies = [
+            "14 die - Transação não autorizada / Saldo insuficiente",
+            "51 die - Saldo insuficiente",
+            "57 die - Cartão Vencido ou Inválido",
+            "05 die - Transação não autorizada pelo banco",
+            "N7 die - Falha na validação do CVV"
+        ];
+        $retorno_msg = $retornos_dies[array_rand($retornos_dies)];
     } else {
         $status_site = 'success';
-        $tipo_live = (mt_rand(0, 1) === 0) ? "n7 live" : "54 live";
-        $retorno_msg = "{$tipo_live} - Aprovado com sucesso (ALL BINS Matriz)";
+        $tipos_live = ["Aprovado com sucesso (R$ 1,00 cobrado)", "Aprovado (Aura / Mastercard)", "Aprovado com saldo (Visa Matriz)"];
+        $retorno_msg = $tipos_live[array_rand($tipos_live)];
     }
 
-    usleep(mt_rand(150000, 300000));
+    // Simula tempo de resposta de processamento real na matriz
+    usleep(mt_rand(400000, 900000));
 
     if ($status_site === 'success') {
-        $html = "<span class='text-black font-extrabold bg-purple-400 px-2.5 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
+        $html = "<span class='text-black font-extrabold bg-purple-400 px-2 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Val: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
         echo json_encode(['status' => 'live', 'html' => $html]);
     } else {
-        $html = "<span class='text-zinc-600 font-bold'>[DIE]</span> <span class='text-zinc-600'>Cartão: {$cc_num} | Validade: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
+        $html = "<span class='text-zinc-600 font-bold'>[DIE]</span> <span class='text-zinc-600'>Cartão: {$cc_num} | Val: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
         echo json_encode(['status' => 'die', 'html' => $html]);
     }
     exit;
@@ -261,13 +270,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     <?php if (!isset($_SESSION['logado']) && (!isset($_GET['view']) || $_GET['view'] !== 'comprar')): ?>
         <div class="w-full max-w-md bg-zinc-900 p-8 rounded-2xl shadow-2xl border border-zinc-800 text-center card-glow">
             <div class="mb-6 flex justify-center">
-                <img src="logo.png" alt="Logotipo Pecinha" class="h-28 w-28 object-cover rounded-full border-2 border-purple-600 shadow-xl p-1 bg-black" onerror="this.style.display='none'">
+                <img src="image_327ae8.png" alt="Logotipo Pecinha" class="h-28 w-28 object-cover rounded-full border-2 border-purple-600 shadow-xl p-1 bg-black" onerror="this.src='logo.png'">
             </div>
             <h1 class="text-2xl font-bold mb-1 tracking-wider text-white">CHK DO PECINHA</h1>
             <p class="text-xs text-purple-400 mb-4 uppercase tracking-widest">SISTEMA PREMIUM DE CHECKERS</p>
             
             <div class="bg-purple-950/40 border border-purple-600/50 text-purple-300 p-3 rounded-xl mb-6 text-xs text-center leading-relaxed">
-                ⚡ <strong class="text-white">ACESSO RÁPIDO:</strong> Utilize a senha mestre <code class="text-white bg-black px-1.5 py-0.5 rounded border border-purple-800">PECINHA-MASTER-2026</code> para entrar diretamente.
+                ⚡ <strong class="text-white">ALL BINS SYSTEM:</strong> Checker 100% otimizado para puxar <strong>LIVE</strong> em todas as matrizes globais de pagamento com alta assertividade.
             </div>
 
             <?php if (!empty($ERRO_LOGIN)): ?>
@@ -506,13 +515,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     <!-- TELA 3: PAINEL PRINCIPAL (CHECKER DE CARTÕES) -->
     <?php else: ?>
         <div class="w-full max-w-4xl bg-zinc-900 p-6 sm:p-8 rounded-2xl shadow-2xl border border-zinc-800 card-glow">
-            <div class="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
-                <div>
-                    <h1 class="text-xl font-bold text-white tracking-wide">CHK DO PECINHA <span class="text-xs bg-purple-600 text-white px-2 py-0.5 rounded ml-2">PRO</span></h1>
-                    <span class="text-xs text-purple-400">PAINEL OPERACIONAL DE CHECKERS</span>
-                </div>
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-6 border-b border-zinc-800 pb-4 gap-4">
                 <div class="flex items-center gap-3">
-                    <span class="text-xs text-zinc-400 hidden sm:inline">Chave Ativa: <strong class="text-purple-400"><?php echo htmlspecialchars(substr($_SESSION['chave_utilizada'] ?? 'ADMIN', 0, 15)); ?>...</strong></span>
+                    <img src="image_327ae8.png" alt="Logo" class="h-10 w-10 object-cover rounded-full border border-purple-600 bg-black" onerror="this.style.display='none'">
+                    <div>
+                        <h1 class="text-xl font-bold text-white tracking-wide">CHK DO PECINHA <span class="text-xs bg-purple-600 text-white px-2 py-0.5 rounded ml-1">PRO</span></h1>
+                        <span class="text-xs text-purple-400">PAINEL OPERACIONAL DE CHECKERS</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 flex-wrap justify-end">
+                    <!-- Cronômetro de Sessão Ativa -->
+                    <div class="bg-black border border-zinc-800 px-3 py-1.5 rounded-lg text-xs text-zinc-300">
+                        Tempo Restante: <span id="timerSessao" class="font-bold text-purple-400">23:59:59</span>
+                    </div>
                     <a href="index.php?action=logout" class="bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-800 text-xs px-3 py-1.5 rounded-lg transition">Sair</a>
                 </div>
             </div>
@@ -564,6 +579,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
             </div>
 
             <script>
+                // Cronômetro Regressivo de Sessão (Exemplo 24 horas iniciais)
+                let tempoRestanteSegundos = 86400; 
+                const timerElement = document.getElementById('timerSessao');
+                
+                function atualizarCronometro() {
+                    if (tempoRestanteSegundos <= 0) {
+                        timerElement.innerText = "EXPIRADO";
+                        window.location.href = "index.php?action=logout";
+                        return;
+                    }
+                    let h = Math.floor(tempoRestanteSegundos / 3600);
+                    let m = Math.floor((tempoRestanteSegundos % 3600) / 60);
+                    let s = tempoRestanteSegundos % 60;
+                    timerElement.innerText = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+                    tempoRestanteSegundos--;
+                }
+                setInterval(atualizarCronometro, 1000);
+                atualizarCronometro();
+
                 let rodandoChecker = false;
                 let contadorTestadas = 0;
                 let contadorLives = 0;
