@@ -6,13 +6,16 @@ session_start();
 
 // Chave Mestre Única e Infinita (Alfanumérica)
 $CHAVE_MESTRE_INFINITA = "PECINHA2020MASTER";
-$CHAVES_INTERNAS = [
-    '1'  => 'PECINHA-1DIA-778899',
-    '7'  => 'PECINHA-7DIAS-445566',
-    '15' => 'PECINHA-15DIAS-223344',
-    '30' => 'PECINHA-30DIAS-112233',
-    'infinita' => $CHAVE_MESTRE_INFINITA
-];
+
+// Função para gerar chaves alfanuméricas aleatórias (letras e números misturados)
+function gerarChaveDinamica() {
+    $caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    $chave = '';
+    for ($i = 0; $i < 12; $i++) {
+        $chave .= $caracteres[random_int(0, strlen($caracteres) - 1)];
+    }
+    return 'PECINHA-' . $chave;
+}
 
 $ERRO_LOGIN = "";
 
@@ -21,9 +24,9 @@ define('ELITE_CLIENT_ID', 'ep_684765b9795ccf41b0eb5b108b45199a');
 define('ELITE_CLIENT_SECRET', 'eps_8e43e32f9f1ecb62987145bdbd4f141c1c3b39dcf6e22c6f5ea270f99488577e');
 define('ELITE_BASE_URL', 'https://api.elitepaybr.com/api/v1');
 
-// Planos Disponíveis
+// Planos Disponíveis (Diária alterada para 25,00)
 $PLANOS = [
-    '1'  => ['dias' => 1,  'segundos' => 86400,    'nome' => '1 Dia',  'valor' => 20.00],
+    '1'  => ['dias' => 1,  'segundos' => 86400,    'nome' => '1 Dia',  'valor' => 25.00],
     '7'  => ['dias' => 7,  'segundos' => 604800,  'nome' => '7 Days', 'valor' => 100.00],
     '15' => ['dias' => 15, 'segundos' => 1296000, 'nome' => '15 Dias', 'valor' => 180.00],
     '30' => ['dias' => 30, 'segundos' => 2592000, 'nome' => '30 Dias', 'valor' => 240.00],
@@ -51,8 +54,12 @@ if (isset($_POST['f_login'])) {
     if ($chave_digitada === $CHAVE_MESTRE_INFINITA) {
         $valida_ok = true;
         $tipo_sessao = 'infinita';
-    } elseif (in_array($chave_digitada, array_values($CHAVES_INTERNAS))) {
-        $valida_ok = true;
+    } else {
+        // Verificar se a chave está armazenada nas chaves ativas geradas pelos pagamentos da sessão ou banco simulado
+        $chaves_salvas = $_SESSION['chaves_compradas'] ?? [];
+        if (in_array($chave_digitada, $chaves_salvas)) {
+            $valida_ok = true;
+        }
     }
 
     if ($valida_ok) {
@@ -153,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     exit;
 }
 
-// Ajax: Checar Status do Pagamento
+// Ajax: Checar Status do Pagamento e Gerar Chave Automática
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['acao'] === 'checar_status') {
     header('Content-Type: application/json');
     $payment_id = trim($_POST['payment_id'] ?? '');
@@ -201,7 +208,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     }
 
     if ($status_pago || isset($_POST['forcar_aprovacao'])) {
-        $chave_gerada = $CHAVES_INTERNAS[$plano_id] ?? $CHAVES_INTERNAS['1'];
+        // Geração automática de chave de acesso (letras e números misturados)
+        $chave_gerada = gerarChaveDinamica();
+        if (!isset($_SESSION['chaves_compradas'])) {
+            $_SESSION['chaves_compradas'] = [];
+        }
+        $_SESSION['chaves_compradas'][] = $chave_gerada;
+
         echo json_encode(['status' => 'pago', 'chave' => $chave_gerada]);
     } else {
         echo json_encode(['status' => 'pendente', 'debug_status' => $res_json ?? null]);
@@ -447,9 +460,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
             <div class="glass-card p-6 rounded-2xl flex flex-col justify-between border-zinc-800/80 hover:border-purple-500/40 transition-all">
                 <div>
                     <div class="text-xs gradient-text font-bold uppercase tracking-widest mb-1">📅 1 DIA</div>
-                    <div class="text-4xl font-black text-white mb-4">R$ 20<span class="text-sm font-normal text-zinc-400">,00</span></div>
+                    <div class="text-4xl font-black text-white mb-4">R$ 25<span class="text-sm font-normal text-zinc-400">,00</span></div>
                 </div>
-                <button onclick="abrirCheckout('1', '20.00', '1 Dia')" class="w-full btn-gradient text-white font-bold py-3 rounded-xl text-xs uppercase tracking-widest">Adquirir Agora</button>
+                <button onclick="abrirCheckout('1', '25.00', '1 Dia')" class="w-full btn-gradient text-white font-bold py-3 rounded-xl text-xs uppercase tracking-widest">Adquirir Agora</button>
             </div>
 
             <div class="glass-card p-6 rounded-2xl flex flex-col justify-between border-zinc-800/80 hover:border-purple-500/40 transition-all">
@@ -645,17 +658,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
 
     <!-- TELA 3: PAINEL DO CHECKER (LOGADO) -->
     <?php else: ?>
-    <div class="w-full max-w-4xl glass-card p-6 sm:p-8 rounded-3xl relative">
+    <div class="w-full max-w-5xl glass-card p-6 sm:p-8 rounded-3xl relative">
         <div class="flex flex-wrap justify-between items-center mb-6 pb-4 border-b border-zinc-800/80 gap-3">
             <div>
                 <h1 class="text-2xl font-black text-white">CHK DO PECINHA</h1>
-                <p class="text-xs gradient-text font-bold uppercase tracking-wider">Painel de Validação de Cartões</p>
+                <p class="text-xs gradient-text font-bold uppercase tracking-wider">Painel de Validação de Cartões & Gerador</p>
             </div>
-            <a href="index.php?action=logout" class="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold px-4 py-2 rounded-xl border border-rose-500/20 transition">Sair</a>
+            <div class="flex items-center gap-3">
+                <button onclick="toggleGeradorModal(true)" class="bg-purple-600/20 hover:bg-purple-600/35 text-purple-300 text-xs font-bold px-4 py-2 rounded-xl border border-purple-500/30 transition">🎲 Gerador de Bins</button>
+                <a href="index.php?action=logout" class="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold px-4 py-2 rounded-xl border border-rose-500/20 transition">Sair</a>
+            </div>
         </div>
 
         <div class="space-y-4 mb-6">
-            <textarea id="listaCartoes" rows="6" class="w-full glass-input rounded-2xl p-4 text-xs text-zinc-200 focus:outline-none code-font placeholder-zinc-600 resize-none" placeholder="Insira os cartões no formato: NUMERO|MES|ANO|CVV (um por linha)"></textarea>
+            <textarea id="listaCartoes" rows="5" class="w-full glass-input rounded-2xl p-4 text-xs text-zinc-200 focus:outline-none code-font placeholder-zinc-600 resize-none" placeholder="Insira os cartões no formato: NUMERO|MES|ANO|CVV (um por linha)"></textarea>
             
             <div class="flex gap-3">
                 <button onclick="iniciarChecker()" id="btnIniciar" class="w-full btn-gradient text-white font-bold py-3.5 rounded-2xl text-xs uppercase tracking-widest shadow-lg">
@@ -664,14 +680,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
             </div>
         </div>
 
-        <!-- LOGS -->
-        <div class="glass-card p-4 rounded-2xl border-zinc-800/80">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-3 flex justify-between items-center">
-                <span>Resultado:</span>
-                <span id="statusContador" class="gradient-text code-font">0 / 0</span>
-            </h3>
-            <div id="logsOutput" class="h-64 overflow-y-auto space-y-2 pr-2 code-font text-xs">
-                <span class="text-zinc-600 italic">Aguardando início...</span>
+        <!-- DOIS BLOCOS DE RESULTADOS: LIVE E DIES -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <!-- Bloco LIVE -->
+            <div class="glass-card p-4 rounded-2xl border-emerald-500/30">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-3 flex justify-between items-center">
+                    <span>🟢 Aprovadas (Live):</span>
+                    <span id="contadorLive" class="text-emerald-400 code-font">0</span>
+                </h3>
+                <div id="logsLive" class="h-60 overflow-y-auto space-y-2 pr-2 code-font text-xs">
+                    <span class="text-zinc-600 italic">Nenhuma live ainda...</span>
+                </div>
+            </div>
+
+            <!-- Bloco DIES -->
+            <div class="glass-card p-4 rounded-2xl border-rose-500/30">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-rose-400 mb-3 flex justify-between items-center">
+                    <span>🔴 Reprovadas (Dies):</span>
+                    <span id="contadorDie" class="text-rose-400 code-font">0</span>
+                </h3>
+                <div id="logsDie" class="h-60 overflow-y-auto space-y-2 pr-2 code-font text-xs">
+                    <span class="text-zinc-600 italic">Nenhuma die ainda...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DO GERADOR DE BINS -->
+    <div id="modalGerador" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+        <div class="glass-card p-6 sm:p-8 rounded-3xl w-full max-w-lg relative">
+            <button onclick="toggleGeradorModal(false)" class="absolute top-4 right-4 text-zinc-400 hover:text-white text-lg">✕</button>
+            <h2 class="text-xl font-bold text-white mb-1">🎲 Gerador de Cartões (CC Generator)</h2>
+            <p class="text-xs gradient-text font-semibold mb-4">Gere massa de cartões baseada em BIN</p>
+
+            <div class="space-y-3 mb-4">
+                <div>
+                    <label class="block text-[11px] font-bold uppercase text-zinc-400 mb-1">BIN / Prefixo (Ex: 406669 ou 5347)</label>
+                    <input type="text" id="genBin" class="w-full glass-input rounded-xl p-3 text-xs text-zinc-200 code-font" placeholder="406669">
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase text-zinc-400 mb-1">Mês</label>
+                        <select id="genMes" class="w-full glass-input rounded-xl p-3 text-xs text-zinc-200">
+                            <option value="rnd">Aleatório</option>
+                            <option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option><option value="06">06</option>
+                            <option value="07">07</option><option value="08">08</option><option value="09">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase text-zinc-400 mb-1">Ano</label>
+                        <select id="genAno" class="w-full glass-input rounded-xl p-3 text-xs text-zinc-200">
+                            <option value="rnd">Aleatório</option>
+                            <option value="2027">2027</option><option value="2028">2028</option><option value="2029">2029</option><option value="2030">2030</option><option value="2031">2031</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase text-zinc-400 mb-1">CVV</label>
+                        <input type="text" id="genCvv" class="w-full glass-input rounded-xl p-3 text-xs text-zinc-200 code-font" placeholder="Rnd">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold uppercase text-zinc-400 mb-1">Quantidade</label>
+                    <input type="number" id="genQtd" value="10" min="1" max="100" class="w-full glass-input rounded-xl p-3 text-xs text-zinc-200 code-font">
+                </div>
+                <button onclick="executarGerador()" class="w-full btn-gradient text-white font-bold py-3 rounded-xl text-xs uppercase tracking-widest">Gerar e Enviar para o Checker</button>
+            </div>
+            <div>
+                <textarea id="resultadoGerador" rows="4" readonly class="w-full glass-input rounded-xl p-3 text-xs text-zinc-400 code-font resize-none" placeholder="Cartões gerados aparecerão aqui..."></textarea>
             </div>
         </div>
     </div>
@@ -687,85 +762,118 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     }
 
     // Notificação Flutuante (Toast)
-    function notificarLive(cartao) {
-        tocarSomLive();
-        confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 } });
-
+    function mostrarToast(mensagem) {
         const container = document.getElementById('toastContainer');
         const toast = document.createElement('div');
-        toast.className = 'toast-live glass-card border-emerald-500/40 p-4 rounded-2xl text-xs shadow-2xl flex items-center gap-3 bg-emerald-950/40';
-        toast.innerHTML = `
-            <div class="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-lg">⚡</div>
-            <div>
-                <strong class="block text-emerald-400 font-bold">GG LIVE ENCONTRADA!</strong>
-                <span class="text-zinc-300 code-font">${cartao.substring(0, 12)}...</span>
-            </div>
-        `;
+        toast.className = "toast-live glass-card bg-emerald-950/80 border-emerald-500/50 text-emerald-300 p-4 rounded-2xl text-xs font-bold shadow-2xl flex items-center gap-3";
+        toast.innerHTML = `<span>🟢</span> <div>${mensagem}</div>`;
         container.appendChild(toast);
-
         setTimeout(() => {
             toast.style.opacity = '0';
-            toast.style.transition = 'opacity 0.5s ease';
-            setTimeout(() => toast.remove(), 500);
-        }, 5000);
+            setTimeout(() => toast.remove(), 400);
+        }, 4000);
     }
+
+    function toggleGeradorModal(abrir) {
+        const modal = document.getElementById('modalGerador');
+        if (abrir) {
+            modal.classList.remove('hidden');
+        } else {
+            modal.classList.add('hidden');
+        }
+    }
+
+    function executarGerador() {
+        let bin = document.getElementById('genBin').value.trim().replace(/\D/g, '');
+        if (!bin || bin.length < 4) {
+            alert('Insira uma BIN válida com pelo menos 4 dígitos.');
+            return;
+        }
+        let qtd = parseInt(document.getElementById('genQtd').value) || 10;
+        let mesOpt = document.getElementById('genMes').value;
+        let anoOpt = document.getElementById('genAno').value;
+        let cvvOpt = document.getElementById('genCvv').value.trim();
+
+        let cartoesGerados = [];
+        for (let i = 0; i < qtd; i++) {
+            let cc = bin;
+            while (cc.length < 16) {
+                cc += Math.floor(Math.random() * 10);
+            }
+            let mes = mesOpt === 'rnd' ? String(Math.floor(Math.random() * 12) + 1).padStart(2, '0') : mesOpt;
+            let ano = anoOpt === 'rnd' ? String(Math.floor(Math.random() * 5) + 2027) : anoOpt;
+            let cvv = cvvOpt === '' ? String(Math.floor(Math.random() * 900) + 100) : cvvOpt;
+
+            cartoesGerados.push(`${cc}|${mes}|${ano}|${cvv}`);
+        }
+
+        let resultadoStr = cartoesGerados.join('\n');
+        document.getElementById('resultadoGerador').value = resultadoStr;
+        document.getElementById('listaCartoes').value = resultadoStr;
+        toggleGeradorModal(false);
+        alert(`${qtd} cartões gerados e inseridos no checker com sucesso!`);
+    }
+
+    // Lógica do Checker Assíncrono com Dois Blocos
+    let liveCount = 0;
+    let dieCount = 0;
 
     async function iniciarChecker() {
         const textarea = document.getElementById('listaCartoes');
-        const logs = document.getElementById('logsOutput');
         const btn = document.getElementById('btnIniciar');
-        const linhas = textarea.value.split('\n').filter(l => l.trim() !== '');
+        const linhas = textarea.value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
         if (linhas.length === 0) {
-            alert('Insira ao menos um cartão para testar!');
+            alert('Insira pelo menos uma linha de cartão para validar.');
             return;
         }
 
         btn.disabled = true;
-        btn.innerText = "Processando...";
-        logs.innerHTML = '';
+        btn.innerText = "Validando...";
+        document.getElementById('logsLive').innerHTML = '';
+        document.getElementById('logsDie').innerHTML = '';
+        liveCount = 0;
+        dieCount = 0;
+        document.getElementById('contadorLive').innerText = '0';
+        document.getElementById('contadorDie').innerText = '0';
 
-        let total = linhas.length;
-        let concluidos = 0;
-
-        for (let i = 0; i < total; i++) {
-            const linha = linhas[i].trim();
-            document.getElementById('statusContador').innerText = `${concluidos + 1} / ${total}`;
-
+        for (let i = 0; i < linhas.length; i++) {
+            const linha = linhas.get ? linhas.get(i) : linhas[i];
             const formData = new URLSearchParams();
             formData.append('lista', linha);
 
             try {
-                const res = await fetch('index.php', {
+                const response = await fetch('index.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: formData
                 });
-                const data = await res.json();
-
-                const divLog = document.createElement('div');
-                divLog.className = 'p-2 rounded-xl bg-zinc-950/40 border border-zinc-800/40';
-                divLog.innerHTML = data.html;
-                logs.prepend(divLog);
+                const data = await response.json();
 
                 if (data.status === 'live') {
-                    notificarLive(data.cartao || linha);
+                    liveCount++;
+                    document.getElementById('contadorLive').innerText = liveCount;
+                    const logsLive = document.getElementById('logsLive');
+                    if (liveCount === 1) logsLive.innerHTML = '';
+                    logsLive.innerHTML += `<div class="p-2 rounded-xl bg-emerald-500/5 border border-emerald-500/20 mb-1.5">${data.html}</div>`;
+                    tocarSomLive();
+                    mostrarToast(`Live Aprovada: ${data.cartao.substring(0,6)}******`);
+                } else {
+                    dieCount++;
+                    document.getElementById('contadorDie').innerText = dieCount;
+                    const logsDie = document.getElementById('logsDie');
+                    if (dieCount === 1) logsDie.innerHTML = '';
+                    logsDie.innerHTML += `<div class="p-2 rounded-xl bg-rose-500/5 border border-rose-500/20 mb-1.5">${data.html}</div>`;
                 }
-            } catch (e) {
-                const divLog = document.createElement('div');
-                divLog.className = 'p-2 rounded-xl bg-rose-950/20 border border-rose-800/30 text-rose-400';
-                divLog.innerText = `[ERRO] Falha ao processar linha: ${linha}`;
-                logs.prepend(divLog);
+            } catch (err) {
+                console.error("Erro na validação:", err);
             }
-            concluidos++;
         }
 
         btn.disabled = false;
         btn.innerText = "Iniciar Validação ➔";
-        document.getElementById('statusContador').innerText = `Concluído (${total}/${total})`;
     }
     </script>
     <?php endif; ?>
-
 </body>
 </html>
