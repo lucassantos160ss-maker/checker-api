@@ -257,9 +257,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
         $status_site = 'success';
         $retorno_msg = "000 live - Aprovado com sucesso / Debitado R$ {$valor_debitado}";
     } else {
-        // Demais BINs: comportamento All Bins aleatório (Live ou Die com Não Autorizada)
+        // Demais BINs: 40% de chance de Live, 60% de chance de Die com Não Autorizada
         $chance = mt_rand(1, 100);
-        if ($chance > 40) {
+        if ($chance <= 40) {
             $status_site = 'success';
             $retorno_msg = "54 live - Aprovado com sucesso / Debitado R$ {$valor_debitado}";
         } else {
@@ -268,7 +268,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
         }
     }
 
-    usleep(mt_rand(1500000, 3000000));
+    // Tempo de atraso realista entre 15 e 30 segundos (15000000 a 30000000 microssegundos)
+    usleep(mt_rand(15000000, 30000000));
 
     if ($status_site === 'success') {
         $html = "<span class='bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold px-2.5 py-1 rounded-lg text-xs shadow-sm'>[LIVE]</span> <span class='text-zinc-200 font-medium ml-2'>Cartão: {$cc_num} | Val: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
@@ -864,4 +865,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     </script>
     <?php endif; ?>
 </body>
-</html>
+</html>f
