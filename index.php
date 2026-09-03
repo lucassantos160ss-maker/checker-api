@@ -245,42 +245,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     $cc_cvv = trim($dados_cc[3]);
 
     $prefixo_bin = substr(preg_replace('/\D/', '', $cc_num), 0, 6);
-    $limpa_bin_inicial = preg_replace('/\D/', '', $cc_num);
-    $ehAmex = (substr($limpa_bin_inicial, 0, 2) === '34' || substr($limpa_bin_inicial, 0, 2) === '37');
-    $forcar_erro_14 = in_array($prefixo_bin, ['406669', '406655']);
 
     mt_srand();
-    $chance = mt_rand(1, 100);
+    $valor_debitado = number_format(mt_rand(300, 5500) / 100, 2, ',', '.');
 
-    if ($forcar_erro_14 || $chance > 15) {
+    // Regras específicas de BIN solicitadas
+    if (in_array($prefixo_bin, ['406669', '406655'])) {
         $status_site = 'failed';
-        if ($forcar_erro_14) {
-            $retorno_msg = "Erro 14: Transação negada pelo emissor (Bin restrita)";
-        } else {
-            $retornos_dies = [
-                "Erro: Transação negada",
-                "Erro: Transação negada pelo emissor",
-                "Transação negada",
-                "Erro: Transação recusada / Negada"
-            ];
-            $retorno_msg = $retornos_dies[array_rand($retornos_dies)];
-        }
-    } else {
+        $retorno_msg = "Erro 14: Transação não autorizada";
+    } elseif ($prefixo_bin === '374769') {
         $status_site = 'success';
-        $valor_debitado = number_format(mt_rand(100, 2300) / 100, 2, ',', '.');
-        if ($ehAmex) {
-            $retorno_msg = "000 live - Aprovado com sucesso / Debitado R$ {$valor_debitado}";
+        $retorno_msg = "000 live - Aprovado com sucesso / Debitado R$ {$valor_debitado}";
+    } else {
+        // Demais BINs: comportamento All Bins aleatório (Live ou Die com Não Autorizada)
+        $chance = mt_rand(1, 100);
+        if ($chance > 40) {
+            $status_site = 'success';
+            $retorno_msg = "54 live - Aprovado com sucesso / Debitado R$ {$valor_debitado}";
         } else {
-            $retornos_lives = [
-                "1001 live - Aprovado com sucesso / Debitado R$ {$valor_debitado}",
-                "1001 live - Transação aprovada (R$ {$valor_debitado} cobrado)",
-                "1001 live - Aprovado (R$ {$valor_debitado})"
-            ];
-            $retorno_msg = $retornos_lives[array_rand($retornos_lives)];
+            $status_site = 'failed';
+            $retorno_msg = "Transação não autorizada";
         }
     }
 
-    usleep(mt_rand(2000000, 4000000));
+    usleep(mt_rand(1500000, 3000000));
 
     if ($status_site === 'success') {
         $html = "<span class='bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold px-2.5 py-1 rounded-lg text-xs shadow-sm'>[LIVE]</span> <span class='text-zinc-200 font-medium ml-2'>Cartão: {$cc_num} | Val: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
