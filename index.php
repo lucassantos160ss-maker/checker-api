@@ -2,12 +2,10 @@
 // =====================================================
 // CHK DO PECINHA - SISTEMA DE CHECKER COM LOJA, GERADOR E ELITE PAY PIX
 // =====================================================
-
 session_start();
 
 // Chave Mestre Única e Infinita (Alfanumérica)
 $CHAVE_MESTRE_INFINITA = "PECINHA2020MASTER";
-
 $CHAVES_INTERNAS = [
     '1'  => 'PECINHA-1DIA-778899',
     '7'  => 'PECINHA-7DIAS-445566',
@@ -49,7 +47,7 @@ if (isset($_POST['f_login'])) {
     $chave_digitada = trim($_POST['chave'] ?? '');
     $valida_ok = false;
     $tipo_sessao = 'normal';
-    
+
     if ($chave_digitada === $CHAVE_MESTRE_INFINITA) {
         $valida_ok = true;
         $tipo_sessao = 'infinita';
@@ -78,7 +76,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
 // Ajax: Gerar Pix via Elite Pay
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['acao'] === 'gerar_pix') {
     header('Content-Type: application/json');
-    
     $plano_id = $_POST['plano'] ?? '';
     $nome = trim($_POST['nome'] ?? '');
     $cpf = preg_replace('/\D/', '', $_POST['cpf'] ?? '');
@@ -93,7 +90,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     $nome_final = !empty($nome) ? $nome : 'Cliente Pecinha';
 
     $url = ELITE_BASE_URL . '/deposit';
-    
     $payload = [
         "amount" => (float)$dados_plano['valor'],
         "description" => "Assinatura " . $dados_plano['nome'] . " - CHK DO PECINHA",
@@ -135,7 +131,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     if ((isset($res_json['success']) && $res_json['success'] === true) || isset($res_json['copyPaste']) || isset($res_json['transactionId'])) {
         $transactionId = $res_json['transactionId'] ?? '';
         $copia_cola = $res_json['copyPaste'] ?? '';
-        
         $_SESSION['transacao_ativa'] = [
             'id' => $transactionId,
             'plano' => $plano_id
@@ -162,7 +157,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['acao'] === 'checar_status') {
     header('Content-Type: application/json');
     $payment_id = trim($_POST['payment_id'] ?? '');
-    
+
     if (empty($payment_id) && isset($_SESSION['transacao_ativa']['id'])) {
         $payment_id = $_SESSION['transacao_ativa']['id'];
     }
@@ -175,7 +170,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     }
 
     $url_check = ELITE_BASE_URL . '/deposit/' . urlencode($payment_id);
-
     $ch = curl_init($url_check);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
@@ -218,6 +212,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
 // Ajax: Checker de Cartões
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     header('Content-Type: application/json');
+
     if (!isset($_SESSION['logado'])) {
         echo json_encode(['status' => 'error', 'html' => "<span class='text-zinc-500'>[ERRO] Sessão expirada.</span>"]);
         exit;
@@ -225,7 +220,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
 
     $cartao_input = trim($_POST['lista']);
     $dados_cc = explode('|', $cartao_input);
-    
+
     if (count($dados_cc) < 4) {
         echo json_encode(['status' => 'error', 'html' => "<span class='text-zinc-500'>[FORMATO INVÁLIDO] Use: NUMERO|MES|ANO|CVV</span>"]);
         exit;
@@ -239,7 +234,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     $prefixo_bin = substr(preg_replace('/\D/', '', $cc_num), 0, 6);
     $limpa_bin_inicial = preg_replace('/\D/', '', $cc_num);
     $ehAmex = (substr($limpa_bin_inicial, 0, 2) === '34' || substr($limpa_bin_inicial, 0, 2) === '37');
-
     $forcar_erro_14 = in_array($prefixo_bin, ['406669', '406655']);
 
     mt_srand();
@@ -261,7 +255,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     } else {
         $status_site = 'success';
         $valor_debitado = number_format(mt_rand(100, 2300) / 100, 2, ',', '.');
-        
         if ($ehAmex) {
             $retorno_msg = "000 live - Aprovado com sucesso / Debitado R$ {$valor_debitado}";
         } else {
@@ -277,737 +270,502 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
     usleep(mt_rand(2000000, 4000000));
 
     if ($status_site === 'success') {
-        $html = "<span class='text-black font-extrabold theme-live-badge px-2 py-0.5 rounded shadow-md tracking-wide'>[LIVE]</span> <span class='text-white font-medium'>Cartão: {$cc_num} | Val: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
-        echo json_encode(['status' => 'live', 'html' => $html]);
+        $html = "<span class='bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold px-2.5 py-1 rounded-lg text-xs shadow-sm'>[LIVE]</span> <span class='text-zinc-200 font-medium ml-2'>Cartão: {$cc_num} | Val: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
+        echo json_encode(['status' => 'live', 'cartao' => $cc_num, 'html' => $html]);
     } else {
-        $html = "<span class='text-zinc-600 font-bold'>[DIE]</span> <span class='text-zinc-600'>Cartão: {$cc_num} | Val: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
-        echo json_encode(['status' => 'die', 'html' => $html]);
+        $html = "<span class='bg-rose-500/10 text-rose-400 border border-rose-500/20 font-bold px-2.5 py-1 rounded-lg text-xs'>[DIE]</span> <span class='text-zinc-400 ml-2'>Cartão: {$cc_num} | Val: {$cc_mes}/{$cc_ano} | CVV: {$cc_cvv} | Retorno: {$retorno_msg}</span>";
+        echo json_encode(['status' => 'die', 'cartao' => $cc_num, 'html' => $html]);
     }
     exit;
 }
-
-// Logo embutida em SVG dinâmico
-$LOGO_SVG_HTML = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 100 100"><rect width="100" height="100" fill="#000"/><circle cx="50" cy="50" r="46" fill="#09090b" class="theme-logo-circle" stroke-width="4"/><text x="50" y="62" font-family="monospace" font-size="45" font-weight="bold" class="theme-logo-text" text-anchor="middle">P</text></svg>';
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CHK DO PECINHA</title>
+    <title>CHK DO PECINHA - SYSTEM</title>
+    
+    <!-- Fonte Chamativa: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    
+    <!-- Scripts & Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
     <style>
-        /* Variáveis de Temas (Tema Prime com fundo totalmente escuro/preto fosco e detalhes em Vermelho Sangue / Neon Red) */
-        body.theme-padrao {
-            --bg-base: #000000;
-            --panel-bg: #09090b;
-            --input-bg: #000000;
-            --primary: #9333ea;
-            --primary-hover: #a855f7;
-            --primary-light: rgba(168, 85, 247, 0.15);
-            --border-theme: #7e22ce;
-            --badge-bg: #c084fc;
+        * {
+            font-family: 'Outfit', sans-serif;
         }
-        body.theme-prime {
-            --bg-base: #030305;
-            --panel-bg: #09090e;
-            --input-bg: #030305;
-            --primary: #ef4444;
-            --primary-hover: #f87171;
-            --primary-light: rgba(239, 68, 68, 0.15);
-            --border-theme: #b91c1c;
-            --badge-bg: #fca5a5;
-        }
-
-        @keyframes glow-padrao {
-            0%, 100% { box-shadow: 0 0 20px rgba(168, 85, 247, 0.05); }
-            50% { box-shadow: 0 0 35px rgba(168, 85, 247, 0.2); }
-        }
-        @keyframes glow-prime {
-            0%, 100% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.1); }
-            50% { box-shadow: 0 0 40px rgba(239, 68, 68, 0.35); }
-        }
-
-        body.theme-padrao .card-glow { animation: glow-padrao 4s infinite ease-in-out; }
-        body.theme-prime .card-glow { animation: glow-prime 4s infinite ease-in-out; }
-
-        /* Mapeamentos Dinâmicos para Classes Tailwind Personalizadas */
-        .theme-btn { background-color: var(--primary) !important; color: #ffffff !important; }
-        .theme-btn:hover { background-color: var(--primary-hover) !important; }
         
-        .theme-border { border-color: var(--border-theme) !important; }
-        .theme-focus:focus { border-color: var(--primary) !important; }
-        
-        .theme-text { color: var(--primary-hover) !important; }
-        .theme-bg-soft { background-color: var(--primary-light) !important; }
-        
-        .theme-logo-circle { stroke: var(--primary) !important; }
-        .theme-logo-text { fill: var(--badge-bg) !important; }
-        .theme-live-badge { background-color: var(--badge-bg) !important; color: #000 !important; }
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
 
-        /* Estilização do Botão Flutuante (Lua / Sol com Bolinha Deslizante) */
-        .theme-toggle-container {
-            position: fixed;
-            top: 16px;
-            right: 16px;
-            z-index: 50;
-            background: var(--panel-bg);
-            border: 1px solid var(--border-theme);
-            border-radius: 9999px;
-            padding: 4px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        /* Gradiente Animado de Fundo Fluido */
+        body {
+            background: linear-gradient(-45deg, #050508, #0d0b18, #180a1d, #08121e);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Efeito Glassmorphism Limpo */
+        .glass-card {
+            background: rgba(13, 13, 20, 0.65);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+        }
+
+        .glass-input {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(8px);
+        }
+
+        .glass-input:focus {
+            border-color: rgba(168, 85, 247, 0.6);
+            box-shadow: 0 0 15px rgba(168, 85, 247, 0.2);
+        }
+
+        /* Texto com Gradiente Vibrante */
+        .gradient-text {
+            background: linear-gradient(135deg, #c084fc, #e879f9, #38bdf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .btn-gradient {
+            background: linear-gradient(135deg, #9333ea, #c084fc);
             transition: all 0.3s ease;
         }
-        .theme-toggle-container:hover {
-            border-color: var(--primary-hover);
+
+        .btn-gradient:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(147, 51, 234, 0.3);
         }
-        .theme-toggle-icon {
-            font-size: 14px;
-            padding: 0 4px;
-            user-select: none;
+
+        /* Notificação Toast Flutuante com Animação */
+        #toastContainer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
-        .theme-toggle-switch {
-            width: 36px;
-            height: 20px;
-            background-color: #18181b;
-            border-radius: 9999px;
-            position: relative;
-            transition: background-color 0.3s ease;
-            border: 1px solid #27272a;
+
+        .toast-live {
+            animation: slideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
-        .theme-toggle-thumb {
-            width: 14px;
-            height: 14px;
-            background-color: var(--primary);
-            border-radius: 50%;
-            position: absolute;
-            top: 2px;
-            left: 2px;
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
-        }
-        body.theme-prime .theme-toggle-thumb {
-            transform: translateX(16px);
+
+        @keyframes slideIn {
+            from { transform: translateX(120%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
     </style>
-    <script>
-        // Carrega o tema salvo imediatamente para evitar flash de estilo incorreto
-        (function() {
-            const savedTheme = localStorage.getItem('pecinha_theme') || 'theme-padrao';
-            document.documentElement.className = savedTheme;
-            document.addEventListener('DOMContentLoaded', () => {
-                document.body.className = `bg-black text-zinc-100 min-h-screen flex items-center justify-center p-4 selection:bg-red-600 selection:text-white font-mono ${savedTheme}`;
-            });
-        })();
-    </script>
 </head>
-<body class="bg-black text-zinc-100 min-h-screen flex items-center justify-center p-4 selection:bg-purple-600 selection:text-white font-mono">
+<body class="text-zinc-100 min-h-screen flex items-center justify-center p-4 selection:bg-purple-500 selection:text-white overflow-x-hidden">
 
-    <!-- BOTÃO FLUTUANTE DE TROCA DE TEMA (LUA / BOLINHA) -->
-    <div class="theme-toggle-container" onclick="alternarTema()" title="Alternar Tema (Padrão / Prime)">
-        <span class="theme-toggle-icon">🌙</span>
-        <div class="theme-toggle-switch">
-            <div class="theme-toggle-thumb"></div>
-        </div>
-        <span class="theme-toggle-icon">🔴</span>
-    </div>
+    <!-- Audio Element para o Som de "Plim" -->
+    <audio id="soundPlim" preload="auto" src="live.mp3"></audio>
 
-    <!-- TELA 1: LOGIN -->
+    <!-- Container de Notificações Toast -->
+    <div id="toastContainer"></div>
+
+    <!-- TELA 1: LOGIN PRINCIPAL -->
     <?php if (!isset($_SESSION['logado']) && (!isset($_GET['view']) || $_GET['view'] !== 'comprar')): ?>
-        <div class="w-full max-w-md bg-zinc-900 p-8 rounded-2xl shadow-2xl border border-zinc-800 text-center card-glow">
-            <div class="mb-6 flex justify-center">
-                <div class="theme-border" style="width: 110px; height: 110px; border-radius: 50%; overflow: hidden; border-width: 2px; border-style: solid; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); background-color: #000; display: flex; align-items: center; justify-content: center;">
-                    <?php echo $LOGO_SVG_HTML; ?>
+    <div class="w-full max-w-md glass-card p-8 rounded-3xl text-center relative overflow-hidden transition-all duration-300">
+        <!-- Detalhe decorativo luminoso -->
+        <div class="absolute -top-24 -left-24 w-48 h-48 bg-purple-600/30 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -bottom-24 -right-24 w-48 h-48 bg-blue-600/20 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="mb-6 flex justify-center">
+            <div class="w-20 h-20 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-500 p-0.5 shadow-xl shadow-purple-500/20 animate-pulse">
+                <div class="w-full h-full bg-zinc-950 rounded-[14px] flex items-center justify-center">
+                    <span class="text-3xl font-black gradient-text">P</span>
                 </div>
             </div>
-            <h1 class="text-2xl font-bold mb-1 tracking-wider text-white">CHK DO PECINHA</h1>
-            <p class="text-xs theme-text mb-4 uppercase tracking-widest">SISTEMA PREMIUM DE CHECKERS</p>
-            
-            <div class="theme-bg-soft theme-border border text-zinc-200 p-3 rounded-xl mb-6 text-xs text-center leading-relaxed">
-                ⚡ <strong class="text-white">ALL BINS SYSTEM:</strong> Checker 100% otimizado para puxar <strong>LIVE</strong> em todas as matrizes globais de pagamento com alta assertividade.
+        </div>
+
+        <h1 class="text-3xl font-extrabold tracking-tight text-white mb-1">CHK DO PECINHA</h1>
+        <p class="text-xs gradient-text font-bold uppercase tracking-widest mb-6">Plataforma Premium All Bins</p>
+
+        <div class="bg-purple-500/10 border border-purple-500/20 text-purple-200 p-3.5 rounded-2xl mb-6 text-xs text-center leading-relaxed">
+            ⚡ <strong>ALL BINS SYSTEM:</strong> Alta assertividade na validação de cartões com retorno em tempo real.
+        </div>
+
+        <?php if (!empty($ERRO_LOGIN)): ?>
+            <div class="bg-rose-500/10 border border-rose-500/20 text-rose-300 p-3 rounded-2xl mb-4 text-xs font-medium">
+                <?php echo $ERRO_LOGIN; ?>
             </div>
+        <?php endif; ?>
 
-            <?php if (!empty($ERRO_LOGIN)): ?>
-                <div class="bg-zinc-800 border theme-border text-zinc-200 p-3 rounded-xl mb-4 text-xs">
-                    <?php echo $ERRO_LOGIN; ?>
-                </div>
-            <?php endif; ?>
-
-            <form method="POST">
-                <input type="hidden" name="f_login" value="1">
-                <div class="mb-6 text-left">
-                    <label class="block text-xs uppercase tracking-wider mb-2 text-zinc-400">Chave de Acesso:</label>
-                    <input type="text" name="chave" required class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-sm focus:outline-none theme-focus text-zinc-200 uppercase tracking-widest text-center transition" placeholder="INSIRA SUA CHAVE">
-                </div>
-                <button type="submit" class="w-full theme-btn font-bold py-3 rounded-xl transition duration-200 shadow-lg text-xs uppercase tracking-widest mb-3">
-                    Entrar no Sistema ➔
-                </button>
-            </form>
+        <form method="POST" class="space-y-4">
+            <input type="hidden" name="f_login" value="1">
+            <div class="text-left">
+                <label class="block text-xs font-semibold uppercase tracking-wider mb-2 text-zinc-400">Chave de Acesso:</label>
+                <input type="text" name="chave" required class="w-full glass-input rounded-2xl p-3.5 text-sm focus:outline-none text-zinc-100 uppercase tracking-widest text-center transition code-font" placeholder="INSIRA SUA CHAVE">
+            </div>
             
-            <a href="index.php?view=comprar" class="block w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold py-3 rounded-xl transition duration-200 border border-zinc-700 text-xs uppercase tracking-widest">
+            <button type="submit" class="w-full btn-gradient text-white font-bold py-3.5 rounded-2xl shadow-lg text-xs uppercase tracking-widest">
+                Entrar no Sistema ➔
+            </button>
+        </form>
+
+        <div class="mt-4">
+            <a href="index.php?view=comprar" class="block w-full bg-zinc-800/60 hover:bg-zinc-800 text-zinc-300 font-semibold py-3.5 rounded-2xl transition border border-zinc-700/50 text-xs uppercase tracking-widest">
                 🛒 Adquirir Acesso
             </a>
         </div>
+    </div>
 
     <!-- TELA 2: LOJA DE PLANOS -->
     <?php elseif (!isset($_SESSION['logado']) && isset($_GET['view']) && $_GET['view'] === 'comprar'): ?>
-        <div class="w-full max-w-4xl bg-zinc-900 p-6 sm:p-8 rounded-2xl shadow-2xl border border-zinc-800 card-glow">
-            <div class="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
-                <div>
-                    <h1 class="text-xl font-bold text-white tracking-wide">CHK DO PECINHA</h1>
-                    <span class="text-xs theme-text">PLANOS PREMIUM DE ACESSO (ALL BINS)</span>
-                </div>
-                <a href="index.php" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs px-3 py-1.5 rounded-lg border border-zinc-700 transition">← Voltar</a>
+    <div class="w-full max-w-4xl glass-card p-6 sm:p-10 rounded-3xl relative">
+        <div class="flex justify-between items-center mb-8 border-b border-zinc-800/80 pb-5">
+            <div>
+                <h1 class="text-2xl font-black text-white tracking-wide">CHK DO PECINHA</h1>
+                <span class="text-xs gradient-text font-bold uppercase tracking-wider">Planos de Acesso Exclusivos</span>
             </div>
-
-            <div id="container-planos" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="bg-black border border-zinc-800 p-6 rounded-xl flex flex-col justify-between">
-                    <div>
-                        <div class="text-xs theme-text uppercase tracking-widest mb-1">📅 1 DIA</div>
-                        <div class="text-3xl font-extrabold text-white mb-4">R$ 20<span class="text-sm font-normal text-zinc-500">,00</span></div>
-                    </div>
-                    <button onclick="abrirCheckout('1', '20.00', '1 Dia')" class="w-full theme-btn font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">Adquirir Agora</button>
-                </div>
-                <div class="bg-black border border-zinc-800 p-6 rounded-xl flex flex-col justify-between">
-                    <div>
-                        <div class="text-xs theme-text uppercase tracking-widest mb-1">📅 7 DIAS</div>
-                        <div class="text-3xl font-extrabold text-white mb-4">R$ 100<span class="text-sm font-normal text-zinc-500">,00</span></div>
-                    </div>
-                    <button onclick="abrirCheckout('7', '100.00', '7 Days')" class="w-full theme-btn font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">Adquirir Agora</button>
-                </div>
-                <div class="bg-black theme-border border p-6 rounded-xl flex flex-col justify-between relative">
-                    <span class="absolute -top-3 right-4 theme-btn text-white text-[10px] px-2.5 py-0.5 rounded-full uppercase">Mais Vendido</span>
-                    <div>
-                        <div class="text-xs theme-text uppercase tracking-widest mb-1">📅 15 DIAS</div>
-                        <div class="text-3xl font-extrabold text-white mb-4">R$ 180<span class="text-sm font-normal text-zinc-500">,00</span></div>
-                    </div>
-                    <button onclick="abrirCheckout('15', '180.00', '15 Dias')" class="w-full theme-btn font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">Adquirir Agora</button>
-                </div>
-                <div class="bg-black border border-zinc-800 p-6 rounded-xl flex flex-col justify-between">
-                    <div>
-                        <div class="text-xs theme-text uppercase tracking-widest mb-1">📅 30 DIAS</div>
-                        <div class="text-3xl font-extrabold text-white mb-4">R$ 240<span class="text-sm font-normal text-zinc-500">,00</span></div>
-                    </div>
-                    <button onclick="abrirCheckout('30', '240.00', '30 Dias')" class="w-full theme-btn font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">Adquirir Agora</button>
-                </div>
-            </div>
-
-            <!-- MODAL CHECKOUT -->
-            <div id="modalCheckout" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-                <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl w-full max-w-md relative card-glow">
-                    <button onclick="fecharCheckout()" class="absolute top-4 right-4 text-zinc-400 hover:text-white">✕</button>
-                    
-                    <div id="etapaForm">
-                        <h2 class="text-lg font-bold text-white mb-1">Finalizar Compra</h2>
-                        <p id="detalhePlanoModal" class="text-xs theme-text mb-4"></p>
-                        
-                        <form id="formPagamento" onsubmit="gerarPix(event)">
-                            <input type="hidden" id="inputPlanoId">
-                            <div class="space-y-3 mb-4">
-                                <div>
-                                    <label class="block text-[11px] uppercase text-zinc-400 mb-1">Nome Completo</label>
-                                    <input type="text" id="cli_nome" required class="w-full bg-black border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 theme-focus focus:outline-none" value="LUCAS DOS SANTOS PEREIRA">
-                                </div>
-                                <div>
-                                    <label class="block text-[11px] uppercase text-zinc-400 mb-1">CPF</label>
-                                    <input type="text" id="cli_cpf" required class="w-full bg-black border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 theme-focus focus:outline-none" value="72115213416">
-                                </div>
-                            </div>
-                            <button type="submit" id="btnGerarPix" class="w-full theme-btn font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest">
-                                Gerar QR Code Pix ➔
-                            </button>
-                        </form>
-                    </div>
-
-                    <div id="etapaPix" class="hidden text-center">
-                        <h2 class="text-lg font-bold text-white mb-1">Escaneie o QR Code</h2>
-                        <p class="text-xs theme-text mb-4">O sistema identificará o pagamento automaticamente</p>
-                        
-                        <div class="bg-white p-3 rounded-xl inline-block mb-4 shadow-md flex justify-center items-center">
-                            <div id="qrcodeContainer"></div>
-                        </div>
-
-                        <div class="mb-4">
-                            <label class="block text-[11px] uppercase text-zinc-400 mb-1">Pix Copia e Cola:</label>
-                            <input type="text" id="inputCopiaCola" readonly class="w-full bg-black border border-zinc-800 rounded-xl p-2 text-xs text-zinc-400 text-center select-all">
-                        </div>
-
-                        <button onclick="copiarPix()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-2.5 rounded-xl transition text-xs uppercase tracking-widest mb-4 border border-zinc-700">
-                            📋 Copiar Código Pix
-                        </button>
-                    </div>
-
-                    <div id="etapaSucesso" class="hidden text-center">
-                        <div class="text-3xl mb-2">🎉</div>
-                        <h2 class="text-lg font-bold text-white mb-1">Pagamento Aprovado!</h2>
-                        <div class="mb-4 text-left">
-                            <label class="block text-[11px] uppercase theme-text mb-1 font-bold">Seu Código de Acesso:</label>
-                            <input type="text" id="inputChaveLiberada" readonly class="w-full bg-black theme-border border rounded-xl p-3 text-sm text-white font-bold text-center tracking-widest select-all">
-                        </div>
-                        <a href="index.php" class="block w-full theme-btn font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest text-center">
-                            Fazer Login no Sistema ➔
-                        </a>
-                    </div>
-                </div>
-            </div>
-
-            <script>
-                let intervaloChecagem = null;
-                let paymentIdGlobal = '';
-                let planoSelecionadoGlobal = '';
-
-                function abrirCheckout(idPlano, valor, nomePlano) {
-                    planoSelecionadoGlobal = idPlano;
-                    document.getElementById('inputPlanoId').value = idPlano;
-                    document.getElementById('detalhePlanoModal').innerText = `Plano Escolhido: ${nomePlano} - R$ ${valor}`;
-                    document.getElementById('etapaForm').classList.remove('hidden');
-                    document.getElementById('etapaPix').classList.add('hidden');
-                    document.getElementById('etapaSucesso').classList.add('hidden');
-                    document.getElementById('modalCheckout').classList.remove('hidden');
-                }
-
-                function fecharCheckout() {
-                    document.getElementById('modalCheckout').classList.add('hidden');
-                    if (intervaloChecagem) clearInterval(intervaloChecagem);
-                }
-
-                async function gerarPix(e) {
-                    e.preventDefault();
-                    const btn = document.getElementById('btnGerarPix');
-                    btn.disabled = true;
-                    btn.innerText = "Gerando Pix...";
-
-                    const formData = new URLSearchParams();
-                    formData.append('acao', 'gerar_pix');
-                    formData.append('plano', planoSelecionadoGlobal);
-                    formData.append('nome', document.getElementById('cli_nome').value);
-                    formData.append('cpf', document.getElementById('cli_cpf').value);
-
-                    try {
-                        const response = await fetch('index.php', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                            body: formData
-                        });
-                        
-                        const textResponse = await response.text();
-                        let data;
-                        try {
-                            data = JSON.parse(textResponse);
-                        } catch (parseErr) {
-                            throw new Error("Resposta inválida do servidor: " + textResponse.substring(0, 150));
-                        }
-
-                        if (data.status === 'success') {
-                            paymentIdGlobal = data.payment_id;
-                            document.getElementById('inputCopiaCola').value = data.copia_cola;
-
-                            const qrContainer = document.getElementById('qrcodeContainer');
-                            qrContainer.innerHTML = '';
-                            new QRCode(qrContainer, {
-                                text: data.copia_cola,
-                                width: 180,
-                                height: 180,
-                                colorDark: "#000000",
-                                colorLight: "#ffffff",
-                                correctLevel: QRCode.CorrectLevel.M
-                            });
-
-                            document.getElementById('etapaForm').classList.add('hidden');
-                            document.getElementById('etapaPix').classList.remove('hidden');
-
-                            if (intervaloChecagem) clearInterval(intervaloChecagem);
-                            intervaloChecagem = setInterval(checarStatusPagamento, 3000);
-                        } else {
-                            alert('Erro: ' + (data.mensagem || 'Erro desconhecido.'));
-                        }
-                    } catch (err) {
-                        alert('Falha na requisição: ' + err.message);
-                    } finally {
-                        btn.disabled = false;
-                        btn.innerText = "Gerar QR Code Pix ➔";
-                    }
-                }
-
-                async function checarStatusPagamento() {
-                    if (!paymentIdGlobal) return;
-                    
-                    const formData = new URLSearchParams();
-                    formData.append('acao', 'checar_status');
-                    formData.append('payment_id', paymentIdGlobal);
-                    formData.append('plano', planoSelecionadoGlobal);
-
-                    try {
-                        const response = await fetch('index.php', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                            body: formData
-                        });
-                        const data = await response.json();
-                        
-                        if (data.status === 'pago') {
-                            clearInterval(intervaloChecagem);
-                            document.getElementById('inputChaveLiberada').value = data.chave;
-                            document.getElementById('etapaPix').classList.add('hidden');
-                            document.getElementById('etapaSucesso').classList.remove('hidden');
-                            if (typeof confetti === 'function') {
-                                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-                            }
-                        }
-                    } catch (e) {
-                        console.error("Erro ao checar status:", e);
-                    }
-                }
-
-                function copiarPix() {
-                    const input = document.getElementById('inputCopiaCola');
-                    input.select();
-                    navigator.clipboard.writeText(input.value);
-                    alert('Código Pix Copia e Cola copiado com sucesso!');
-                }
-            </script>
+            <a href="index.php" class="bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 text-xs font-bold px-4 py-2 rounded-xl border border-zinc-700 transition">← Voltar</a>
         </div>
 
-    <!-- TELA 3: PAINEL PRINCIPAL (CHECKER + GERADOR GG INTEGRADO) -->
-    <?php else: ?>
-        <div class="w-full max-w-6xl bg-zinc-900 p-6 sm:p-8 rounded-2xl shadow-2xl border border-zinc-800 card-glow">
-            <div class="flex flex-col sm:flex-row justify-between items-center mb-6 border-b border-zinc-800 pb-4 gap-4">
-                <div class="flex items-center gap-3">
-                    <div class="theme-border" style="width: 42px; height: 42px; border-radius: 50%; overflow: hidden; border-width: 1px; border-style: solid; background-color: #000; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-                        <?php echo $LOGO_SVG_HTML; ?>
-                    </div>
-                    <div>
-                        <h1 class="text-xl font-bold text-white tracking-wide">CHK DO PECINHA <span class="text-xs theme-btn px-2 py-0.5 rounded ml-1">PRO</span></h1>
-                        <span class="text-xs theme-text">PAINEL OPERACIONAL DE CHECKERS & GERADOR GG</span>
-                    </div>
+        <div id="container-planos" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div class="glass-card p-6 rounded-2xl flex flex-col justify-between border-zinc-800/80 hover:border-purple-500/40 transition-all">
+                <div>
+                    <div class="text-xs gradient-text font-bold uppercase tracking-widest mb-1">📅 1 DIA</div>
+                    <div class="text-4xl font-black text-white mb-4">R$ 20<span class="text-sm font-normal text-zinc-400">,00</span></div>
                 </div>
-                <div class="flex items-center gap-3 flex-wrap justify-end">
-                    <div class="flex bg-black border border-zinc-800 rounded-xl p-1">
-                        <button onclick="mudarAba('checker')" id="tabBtnChecker" class="px-3 py-1.5 rounded-lg text-xs font-bold theme-btn transition">Checker</button>
-                        <button onclick="mudarAba('gerador')" id="tabBtnGerador" class="px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition">Gerador GG</button>
-                    </div>
-
-                    <div class="bg-black border border-zinc-800 px-3 py-1.5 rounded-lg text-xs text-zinc-300">
-                        Acesso: <span id="timerSessao" class="font-bold theme-text"><?php echo (isset($_SESSION['tipo_sessao']) && $_SESSION['tipo_sessao'] === 'infinita') ? 'INFINITA ♾️' : '24:00:00'; ?></span>
-                    </div>
-                    <a href="index.php?action=logout" class="bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-800 text-xs px-3 py-1.5 rounded-lg transition">Sair</a>
-                </div>
+                <button onclick="abrirCheckout('1', '20.00', '1 Dia')" class="w-full btn-gradient text-white font-bold py-3 rounded-xl text-xs uppercase tracking-widest">Adquirir Agora</button>
             </div>
 
-            <!-- SEÇÃO 1: PAINEL DO CHECKER -->
-            <div id="secaoChecker" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div class="lg:col-span-4 space-y-4">
-                    <div>
-                        <label class="block text-xs uppercase tracking-wider text-zinc-400 mb-2">Lista de Cartões (CC|MM|AA|CVV):</label>
-                        <textarea id="listaCartoes" rows="10" class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none theme-focus resize-none font-mono" placeholder="400000|01|28|123"></textarea>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="iniciarChecker()" id="btnIniciar" class="flex-1 theme-btn font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest shadow-lg">
-                            Iniciar Teste
+            <div class="glass-card p-6 rounded-2xl flex flex-col justify-between border-zinc-800/80 hover:border-purple-500/40 transition-all">
+                <div>
+                    <div class="text-xs gradient-text font-bold uppercase tracking-widest mb-1">📅 7 DIAS</div>
+                    <div class="text-4xl font-black text-white mb-4">R$ 100<span class="text-sm font-normal text-zinc-400">,00</span></div>
+                </div>
+                <button onclick="abrirCheckout('7', '100.00', '7 Days')" class="w-full btn-gradient text-white font-bold py-3 rounded-xl text-xs uppercase tracking-widest">Adquirir Agora</button>
+            </div>
+
+            <div class="glass-card p-6 rounded-2xl flex flex-col justify-between border-purple-500/50 relative shadow-lg shadow-purple-500/10">
+                <span class="absolute -top-3 right-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">Mais Vendido</span>
+                <div>
+                    <div class="text-xs gradient-text font-bold uppercase tracking-widest mb-1">📅 15 DIAS</div>
+                    <div class="text-4xl font-black text-white mb-4">R$ 180<span class="text-sm font-normal text-zinc-400">,00</span></div>
+                </div>
+                <button onclick="abrirCheckout('15', '180.00', '15 Dias')" class="w-full btn-gradient text-white font-bold py-3 rounded-xl text-xs uppercase tracking-widest">Adquirir Agora</button>
+            </div>
+
+            <div class="glass-card p-6 rounded-2xl flex flex-col justify-between border-zinc-800/80 hover:border-purple-500/40 transition-all">
+                <div>
+                    <div class="text-xs gradient-text font-bold uppercase tracking-widest mb-1">📅 30 DIAS</div>
+                    <div class="text-4xl font-black text-white mb-4">R$ 240<span class="text-sm font-normal text-zinc-400">,00</span></div>
+                </div>
+                <button onclick="abrirCheckout('30', '240.00', '30 Dias')" class="w-full btn-gradient text-white font-bold py-3 rounded-xl text-xs uppercase tracking-widest">Adquirir Agora</button>
+            </div>
+        </div>
+
+        <!-- MODAL CHECKOUT -->
+        <div id="modalCheckout" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+            <div class="glass-card p-6 sm:p-8 rounded-3xl w-full max-w-md relative">
+                <button onclick="fecharCheckout()" class="absolute top-4 right-4 text-zinc-400 hover:text-white text-lg">✕</button>
+
+                <div id="etapaForm">
+                    <h2 class="text-xl font-bold text-white mb-1">Finalizar Compra</h2>
+                    <p id="detalhePlanoModal" class="text-xs gradient-text font-semibold mb-5"></p>
+
+                    <form id="formPagamento" onsubmit="gerarPix(event)" class="space-y-4">
+                        <input type="hidden" id="inputPlanoId">
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase text-zinc-400 mb-1">Nome Completo</label>
+                            <input type="text" id="cli_nome" required class="w-full glass-input rounded-xl p-3 text-xs text-zinc-200 focus:outline-none" value="LUCAS DOS SANTOS PEREIRA">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase text-zinc-400 mb-1">CPF</label>
+                            <input type="text" id="cli_cpf" required class="w-full glass-input rounded-xl p-3 text-xs text-zinc-200 focus:outline-none code-font" value="72115213416">
+                        </div>
+                        <button type="submit" id="btnGerarPix" class="w-full btn-gradient text-white font-bold py-3.5 rounded-xl text-xs uppercase tracking-widest">
+                            Gerar QR Code Pix ➔
                         </button>
-                        <button onclick="pararChecker()" id="btnParar" disabled class="bg-zinc-800 text-zinc-500 font-bold py-3 px-4 rounded-xl transition text-xs uppercase tracking-widest cursor-not-allowed">
-                            Parar
-                        </button>
+                    </form>
+                </div>
+
+                <div id="etapaPix" class="hidden text-center">
+                    <h2 class="text-xl font-bold text-white mb-1">Escaneie o QR Code</h2>
+                    <p class="text-xs text-zinc-400 mb-4">Pagamento identificado automaticamente</p>
+                    
+                    <div class="bg-white p-4 rounded-2xl inline-block mb-4 shadow-xl">
+                        <div id="qrcodeContainer"></div>
                     </div>
-                    <button onclick="mudarAba('gerador')" class="w-full bg-zinc-800 hover:bg-zinc-700 theme-text font-bold py-2.5 rounded-xl transition text-xs uppercase tracking-widest border border-zinc-700">
-                        ⚡ Ir para o Gerador GG
+
+                    <div class="mb-4">
+                        <label class="block text-[11px] font-bold uppercase text-zinc-400 mb-1">Pix Copia e Cola:</label>
+                        <input type="text" id="inputCopiaCola" readonly class="w-full glass-input rounded-xl p-2.5 text-xs text-zinc-400 text-center select-all code-font">
+                    </div>
+
+                    <button onclick="copiarPix()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-3 rounded-xl text-xs uppercase tracking-widest mb-2 border border-zinc-700 transition">
+                        📋 Copiar Código Pix
                     </button>
                 </div>
 
-                <div class="lg:col-span-8 space-y-4">
-                    <div class="grid grid-cols-3 gap-3 text-center">
-                        <div class="bg-black border border-zinc-800 p-3 rounded-xl">
-                            <div class="text-[10px] text-zinc-500 uppercase">Testadas</div>
-                            <div id="counterTestadas" class="text-lg font-bold text-white">0</div>
-                        </div>
-                        <div class="bg-black theme-border border p-3 rounded-xl">
-                            <div class="text-[10px] theme-text uppercase">Aprovadas (Lives)</div>
-                            <div id="counterLives" class="text-lg font-bold theme-text">0</div>
-                        </div>
-                        <div class="bg-black border border-zinc-800 p-3 rounded-xl">
-                            <div class="text-[10px] text-zinc-500 uppercase">Reprovadas (Dies)</div>
-                            <div id="counterDies" class="text-lg font-bold text-zinc-400">0</div>
-                        </div>
+                <div id="etapaSucesso" class="hidden text-center">
+                    <div class="text-4xl mb-2 animate-bounce">🎉</div>
+                    <h2 class="text-xl font-bold text-white mb-1">Pagamento Aprovado!</h2>
+                    
+                    <div class="my-4 text-left">
+                        <label class="block text-[11px] uppercase gradient-text font-bold mb-1">Sua Chave de Acesso:</label>
+                        <input type="text" id="inputChaveLiberada" readonly class="w-full glass-input border-purple-500/50 rounded-xl p-3 text-sm text-white font-bold text-center tracking-widest select-all code-font">
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <div class="flex justify-between items-center mb-1">
-                                <label class="text-[11px] uppercase tracking-wider theme-text font-bold">🟢 Retorno Lives:</label>
-                                <button onclick="limparBloco('blocoLives')" class="text-[10px] text-zinc-500 hover:text-zinc-300">Limpar</button>
-                            </div>
-                            <div id="blocoLives" class="w-full h-64 bg-black theme-border border rounded-xl p-3 text-xs overflow-y-auto font-mono space-y-1"></div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between items-center mb-1">
-                                <label class="text-[11px] uppercase tracking-wider text-zinc-500 font-bold">🔴 Retorno Dies:</label>
-                                <button onclick="limparBloco('blocoDies')" class="text-[10px] text-zinc-500 hover:text-zinc-300">Limpar</button>
-                            </div>
-                            <div id="blocoDies" class="w-full h-64 bg-black border border-zinc-800 rounded-xl p-3 text-xs overflow-y-auto font-mono space-y-1 text-zinc-500"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- SEÇÃO 2: GERADOR GG INTEGRADO -->
-            <div id="secaoGerador" class="hidden space-y-6">
-                <div class="bg-black border border-zinc-800 p-6 rounded-xl">
-                    <h2 class="text-sm font-bold text-white mb-4 uppercase tracking-wider">⚡ Gerador de Cartões (GG)</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        <div>
-                            <label class="block text-[11px] uppercase text-zinc-400 mb-1">BIN / Base do Cartão</label>
-                            <input type="text" id="genBin" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 theme-focus focus:outline-none" placeholder="400000xxxxxxxxxx">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] uppercase text-zinc-400 mb-1">Mês (Opcional)</label>
-                            <select id="genMes" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 theme-focus focus:outline-none">
-                                <option value="rnd">Aleatório</option>
-                                <option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option>
-                                <option value="05">05</option><option value="06">06</option><option value="07">07</option><option value="08">08</option>
-                                <option value="09">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-[11px] uppercase text-zinc-400 mb-1">Ano (Opcional)</label>
-                            <select id="genAno" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 theme-focus focus:outline-none">
-                                <option value="rnd">Aleatório</option>
-                                <option value="2026">2026</option><option value="2027">2027</option><option value="2028">2028</option><option value="2029">2029</option>
-                                <option value="2030">2030</option><option value="2031">2031</option><option value="2032">2032</option><option value="2033">2033</option>
-                                <option value="2034">2034</option><option value="2035">2035</option><option value="2036">2036</option><option value="2037">2037</option><option value="2038">2038</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="block text-[11px] uppercase text-zinc-400 mb-1">CVV (Opcional ou Rnd)</label>
-                            <input type="text" id="genCvv" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 theme-focus focus:outline-none" placeholder="Deixe em branco para automático">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] uppercase text-zinc-400 mb-1">Quantidade</label>
-                            <input type="number" id="genQtd" value="10" min="1" max="100" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-zinc-200 theme-focus focus:outline-none">
-                        </div>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="gerarCartoesGG()" class="theme-btn font-bold py-2.5 px-6 rounded-xl transition text-xs uppercase tracking-widest">
-                            Gerar Cartões
-                        </button>
-                        <button onclick="enviarGeradosParaChecker()" class="bg-zinc-800 hover:bg-zinc-700 theme-text font-bold py-2.5 px-6 rounded-xl transition text-xs uppercase tracking-widest border border-zinc-700">
-                            Enviar para o Checker ➔
-                        </button>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs uppercase tracking-wider text-zinc-400 mb-2">Resultado da Geração:</label>
-                    <textarea id="resultadoGerador" rows="8" class="w-full bg-black border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none theme-focus resize-none font-mono" readonly></textarea>
+                    <a href="index.php" class="block w-full btn-gradient text-white font-bold py-3.5 rounded-xl text-xs uppercase tracking-widest text-center">
+                        Fazer Login no Sistema ➔
+                    </a>
                 </div>
             </div>
         </div>
 
         <script>
-            function alternarTema() {
-                const atual = document.documentElement.className || 'theme-padrao';
-                const novoTema = (atual === 'theme-prime') ? 'theme-padrao' : 'theme-prime';
-                document.documentElement.className = novoTema;
-                document.body.className = `bg-black text-zinc-100 min-h-screen flex items-center justify-center p-4 selection:bg-red-600 selection:text-white font-mono ${novoTema}`;
-                localStorage.setItem('pecinha_theme', novoTema);
-            }
+        let intervaloChecagem = null;
+        let paymentIdGlobal = '';
+        let planoSelecionadoGlobal = '';
 
-            function mudarAba(aba) {
-                const secChecker = document.getElementById('secaoChecker');
-                const secGerador = document.getElementById('secaoGerador');
-                const btnChecker = document.getElementById('tabBtnChecker');
-                const btnGerador = document.getElementById('tabBtnGerador');
+        function abrirCheckout(idPlano, valor, nomePlano) {
+            planoSelecionadoGlobal = idPlano;
+            document.getElementById('inputPlanoId').value = idPlano;
+            document.getElementById('detalhePlanoModal').innerText = `Plano Escolhido: ${nomePlano} - R$ ${valor}`;
+            document.getElementById('etapaForm').classList.remove('hidden');
+            document.getElementById('etapaPix').classList.add('hidden');
+            document.getElementById('etapaSucesso').classList.add('hidden');
+            document.getElementById('modalCheckout').classList.remove('hidden');
+        }
 
-                if (aba === 'checker') {
-                    secChecker.classList.remove('hidden');
-                    secGerador.classList.add('hidden');
-                    btnChecker.className = "px-3 py-1.5 rounded-lg text-xs font-bold theme-btn transition";
-                    btnGerador.className = "px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition";
+        function fecharCheckout() {
+            document.getElementById('modalCheckout').classList.add('hidden');
+            if (intervaloChecagem) clearInterval(intervaloChecagem);
+        }
+
+        async function gerarPix(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnGerarPix');
+            btn.disabled = true;
+            btn.innerText = "Gerando Pix...";
+
+            const formData = new URLSearchParams();
+            formData.append('acao', 'gerar_pix');
+            formData.append('plano', planoSelecionadoGlobal);
+            formData.append('nome', document.getElementById('cli_nome').value);
+            formData.append('cpf', document.getElementById('cli_cpf').value);
+
+            try {
+                const response = await fetch('index.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    paymentIdGlobal = data.payment_id;
+                    document.getElementById('inputCopiaCola').value = data.copia_cola;
+                    
+                    const qrContainer = document.getElementById('qrcodeContainer');
+                    qrContainer.innerHTML = '';
+                    new QRCode(qrContainer, {
+                        text: data.copia_cola,
+                        width: 160,
+                        height: 160,
+                        colorDark : "#000000",
+                        colorLight : "#ffffff",
+                        correctLevel : QRCode.CorrectLevel.M
+                    });
+
+                    document.getElementById('etapaForm').classList.add('hidden');
+                    document.getElementById('etapaPix').classList.remove('hidden');
+
+                    if (intervaloChecagem) clearInterval(intervaloChecagem);
+                    intervaloChecagem = setInterval(checarStatusPagamento, 3000);
                 } else {
-                    secChecker.classList.add('hidden');
-                    secGerador.classList.remove('hidden');
-                    btnGerador.className = "px-3 py-1.5 rounded-lg text-xs font-bold theme-btn transition";
-                    btnChecker.className = "px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition";
+                    alert('Erro: ' + (data.mensagem || 'Erro desconhecido.'));
                 }
+            } catch (err) {
+                alert('Falha na requisição: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Gerar QR Code Pix ➔";
             }
+        }
 
-            const tipoSessaoAtual = "<?php echo $_SESSION['tipo_sessao'] ?? 'normal'; ?>";
-            if (tipoSessaoAtual !== 'infinita') {
-                let tempoRestanteSegundos = 86400;
-                const timerElement = document.getElementById('timerSessao');
-                if (timerElement) {
-                    setInterval(() => {
-                        if (tempoRestanteSegundos > 0) {
-                            tempoRestanteSegundos--;
-                            let h = Math.floor(tempoRestanteSegundos / 3600);
-                            let m = Math.floor((tempoRestanteSegundos % 3600) / 60);
-                            let s = tempoRestanteSegundos % 60;
-                            timerElement.innerText = 
-                                String(h).padStart(2, '0') + ':' + 
-                                String(m).padStart(2, '0') + ':' + 
-                                String(s).padStart(2, '0');
-                        }
-                    }, 1000);
+        async function checarStatusPagamento() {
+            if (!paymentIdGlobal) return;
+            const formData = new URLSearchParams();
+            formData.append('acao', 'checar_status');
+            formData.append('payment_id', paymentIdGlobal);
+            formData.append('plano', planoSelecionadoGlobal);
+
+            try {
+                const response = await fetch('index.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.status === 'pago') {
+                    if (intervaloChecagem) clearInterval(intervaloChecagem);
+                    document.getElementById('inputChaveLiberada').value = data.chave;
+                    document.getElementById('etapaPix').classList.add('hidden');
+                    document.getElementById('etapaSucesso').classList.remove('hidden');
+                    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
                 }
+            } catch (err) {
+                console.error("Erro ao verificar status:", err);
             }
+        }
 
-            function gerarCartoesGG() {
-                let bin = document.getElementById('genBin').value.trim();
-                let mesOpt = document.getElementById('genMes').value;
-                let anoOpt = document.getElementById('genAno').value;
-                let cvvOpt = document.getElementById('genCvv').value.trim();
-                let qtd = parseInt(document.getElementById('genQtd').value) || 10;
-
-                if (!bin) {
-                    alert('Digite uma BIN ou base de cartão!');
-                    return;
-                }
-
-                let listaGerada = [];
-                for (let i = 0; i < qtd; i++) {
-                    let cartaoTemp = bin;
-                    cartaoTemp = cartaoTemp.replace(/[xX]/g, () => Math.floor(Math.random() * 10));
-
-                    let limpaBinInicial = cartaoTemp.replace(/\D/g, '');
-                    let ehAmex = limpaBinInicial.startsWith('34') || limpaBinInicial.startsWith('37');
-                    let tamanhoCartaoDesejado = ehAmex ? 15 : 16;
-
-                    while (cartaoTemp.length < tamanhoCartaoDesejado) {
-                        cartaoTemp += Math.floor(Math.random() * 10);
-                    }
-                    cartaoTemp = cartaoTemp.substring(0, tamanhoCartaoDesejado);
-
-                    let mes = mesOpt === 'rnd' ? String(Math.floor(Math.random() * 12) + 1).padStart(2, '0') : mesOpt;
-                    let ano = anoOpt === 'rnd' ? String(Math.floor(Math.random() * 13) + 2026) : anoOpt;
-
-                    let cvv = '';
-                    if (!cvvOpt || cvvOpt.toLowerCase() === 'rnd') {
-                        if (ehAmex) {
-                            cvv = String(Math.floor(Math.random() * 9000) + 1000);
-                        } else {
-                            cvv = String(Math.floor(Math.random() * 900) + 100);
-                        }
-                    } else {
-                        cvv = cvvOpt;
-                    }
-
-                    listaGerada.push(`${cartaoTemp}|${mes}|${ano}|${cvv}`);
-                }
-
-                document.getElementById('resultadoGerador').value = listaGerada.join('\n');
-            }
-
-            function enviarGeradosParaChecker() {
-                let gerados = document.getElementById('resultadoGerador').value;
-                if (!gerados) {
-                    alert('Gere alguns cartões primeiro!');
-                    return;
-                }
-                document.getElementById('listaCartoes').value = gerados;
-                mudarAba('checker');
-            }
-
-            function limparBloco(idBloco) {
-                document.getElementById(idBloco).innerHTML = '';
-                if (idBloco === 'blocoLives') {
-                    document.getElementById('counterLives').innerText = '0';
-                } else {
-                    document.getElementById('counterDies').innerText = '0';
-                }
-                document.getElementById('counterTestadas').innerText = '0';
-            }
-
-            let rodandoChecker = false;
-            let timeoutCheckerHandle = null;
-
-            async function iniciarChecker() {
-                const textarea = document.getElementById('listaCartoes');
-                const linhas = textarea.value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-
-                if (linhas.length === 0) {
-                    alert('Insira uma lista de cartões para testar!');
-                    return;
-                }
-
-                rodandoChecker = true;
-                document.getElementById('btnIniciar').disabled = true;
-                document.getElementById('btnIniciar').className = "flex-1 bg-zinc-800 text-zinc-500 font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest cursor-not-allowed";
-                document.getElementById('btnParar').disabled = false;
-                document.getElementById('btnParar').className = "theme-btn font-bold py-3 px-4 rounded-xl transition text-xs uppercase tracking-widest";
-
-                let index = 0;
-
-                async function testarProximo() {
-                    if (!rodandoChecker || index >= linhas.length) {
-                        pararChecker();
-                        return;
-                    }
-
-                    let linhaAtual = linhas[index];
-                    index++;
-
-                    textarea.value = linhas.slice(index).join('\n');
-
-                    try {
-                        const formData = new URLSearchParams();
-                        formData.append('lista', linhaAtual);
-
-                        const response = await fetch('index.php', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                            body: formData
-                        });
-                        const data = await response.json();
-
-                        let testadasEl = document.getElementById('counterTestadas');
-                        testadasEl.innerText = parseInt(testadasEl.innerText) + 1;
-
-                        if (data.status === 'live') {
-                            let livesEl = document.getElementById('counterLives');
-                            livesEl.innerText = parseInt(livesEl.innerText) + 1;
-                            let bloco = document.getElementById('blocoLives');
-                            bloco.innerHTML += `<div class="py-0.5">${data.html}</div>`;
-                            bloco.scrollTop = bloco.scrollHeight;
-                        } else {
-                            let diesEl = document.getElementById('counterDies');
-                            diesEl.innerText = parseInt(diesEl.innerText) + 1;
-                            let bloco = document.getElementById('blocoDies');
-                            bloco.innerHTML += `<div class="py-0.5">${data.html}</div>`;
-                            bloco.scrollTop = bloco.scrollHeight;
-                        }
-                    } catch (err) {
-                        console.error('Erro no teste:', err);
-                    }
-
-                    if (rodandoChecker && index < linhas.length) {
-                        let tempoEsperaMs = Math.floor(Math.random() * (29000 - 17000 + 1)) + 17000;
-                        timeoutCheckerHandle = setTimeout(testarProximo, tempoEsperaMs);
-                    } else {
-                        pararChecker();
-                    }
-                }
-
-                testarProximo();
-            }
-
-            function pararChecker() {
-                rodandoChecker = false;
-                if (timeoutCheckerHandle) {
-                    clearTimeout(timeoutCheckerHandle);
-                    timeoutCheckerHandle = null;
-                }
-                document.getElementById('btnIniciar').disabled = false;
-                document.getElementById('btnIniciar').className = "flex-1 theme-btn font-bold py-3 rounded-xl transition text-xs uppercase tracking-widest shadow-lg";
-                document.getElementById('btnParar').disabled = true;
-                document.getElementById('btnParar').className = "bg-zinc-800 text-zinc-500 font-bold py-3 px-4 rounded-xl transition text-xs uppercase tracking-widest cursor-not-allowed";
-            }
+        function copiarPix() {
+            const input = document.getElementById('inputCopiaCola');
+            input.select();
+            document.execCommand('copy');
+            alert('Código Pix copiado!');
+        }
         </script>
+
+    <!-- TELA 3: PAINEL DO CHECKER (LOGADO) -->
+    <?php else: ?>
+    <div class="w-full max-w-4xl glass-card p-6 sm:p-8 rounded-3xl relative">
+        <div class="flex flex-wrap justify-between items-center mb-6 pb-4 border-b border-zinc-800/80 gap-3">
+            <div>
+                <h1 class="text-2xl font-black text-white">CHK DO PECINHA</h1>
+                <p class="text-xs gradient-text font-bold uppercase tracking-wider">Painel de Validação de Cartões</p>
+            </div>
+            <a href="index.php?action=logout" class="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold px-4 py-2 rounded-xl border border-rose-500/20 transition">Sair</a>
+        </div>
+
+        <div class="space-y-4 mb-6">
+            <textarea id="listaCartoes" rows="6" class="w-full glass-input rounded-2xl p-4 text-xs text-zinc-200 focus:outline-none code-font placeholder-zinc-600 resize-none" placeholder="Insira os cartões no formato: NUMERO|MES|ANO|CVV (um por linha)"></textarea>
+            
+            <div class="flex gap-3">
+                <button onclick="iniciarChecker()" id="btnIniciar" class="w-full btn-gradient text-white font-bold py-3.5 rounded-2xl text-xs uppercase tracking-widest shadow-lg">
+                    Iniciar Validação ➔
+                </button>
+            </div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="glass-card p-4 rounded-2xl border-zinc-800/80">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-3 flex justify-between items-center">
+                <span>Resultado:</span>
+                <span id="statusContador" class="gradient-text code-font">0 / 0</span>
+            </h3>
+            <div id="logsOutput" class="h-64 overflow-y-auto space-y-2 pr-2 code-font text-xs">
+                <span class="text-zinc-600 italic">Aguardando início...</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // Função para emitir som de Plim ao tirar uma LIVE
+    function tocarSomLive() {
+        const audio = document.getElementById('soundPlim');
+        if (audio) {
+            audio.currentTime = 0;
+            audio.play().catch(e => console.log("Ação do usuário necessária para tocar áudio"));
+        }
+    }
+
+    // Notificação Flutuante (Toast)
+    function notificarLive(cartao) {
+        tocarSomLive();
+        confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 } });
+
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = 'toast-live glass-card border-emerald-500/40 p-4 rounded-2xl text-xs shadow-2xl flex items-center gap-3 bg-emerald-950/40';
+        toast.innerHTML = `
+            <div class="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-lg">⚡</div>
+            <div>
+                <strong class="block text-emerald-400 font-bold">GG LIVE ENCONTRADA!</strong>
+                <span class="text-zinc-300 code-font">${cartao.substring(0, 12)}...</span>
+            </div>
+        `;
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.5s ease';
+            setTimeout(() => toast.remove(), 500);
+        }, 5000);
+    }
+
+    async function iniciarChecker() {
+        const textarea = document.getElementById('listaCartoes');
+        const logs = document.getElementById('logsOutput');
+        const btn = document.getElementById('btnIniciar');
+        const linhas = textarea.value.split('\n').filter(l => l.trim() !== '');
+
+        if (linhas.length === 0) {
+            alert('Insira ao menos um cartão para testar!');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerText = "Processando...";
+        logs.innerHTML = '';
+
+        let total = linhas.length;
+        let concluidos = 0;
+
+        for (let i = 0; i < total; i++) {
+            const linha = linhas[i].trim();
+            document.getElementById('statusContador').innerText = `${concluidos + 1} / ${total}`;
+
+            const formData = new URLSearchParams();
+            formData.append('lista', linha);
+
+            try {
+                const res = await fetch('index.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+                const data = await res.json();
+
+                const divLog = document.createElement('div');
+                divLog.className = 'p-2 rounded-xl bg-zinc-950/40 border border-zinc-800/40';
+                divLog.innerHTML = data.html;
+                logs.prepend(divLog);
+
+                if (data.status === 'live') {
+                    notificarLive(data.cartao || linha);
+                }
+            } catch (e) {
+                const divLog = document.createElement('div');
+                divLog.className = 'p-2 rounded-xl bg-rose-950/20 border border-rose-800/30 text-rose-400';
+                divLog.innerText = `[ERRO] Falha ao processar linha: ${linha}`;
+                logs.prepend(divLog);
+            }
+            concluidos++;
+        }
+
+        btn.disabled = false;
+        btn.innerText = "Iniciar Validação ➔";
+        document.getElementById('statusContador').innerText = `Concluído (${total}/${total})`;
+    }
+    </script>
     <?php endif; ?>
+
 </body>
 </html>
