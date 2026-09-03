@@ -379,8 +379,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['lista'])) {
 </head>
 <body class="text-zinc-100 min-h-screen flex items-center justify-center p-4 selection:bg-purple-500 selection:text-white overflow-x-hidden">
 
-    <!-- Audio Element para o Som de "Plim" -->
-    <audio id="soundPlim" preload="auto" src="live.mp3"></audio>
+    <!-- Audio Element com Link Direto para o Som de "Plim" -->
+    <audio id="soundPlim" preload="auto" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"></audio>
 
     <!-- Container de Notificações Toast -->
     <div id="toastContainer"></div>
